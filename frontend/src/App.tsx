@@ -1,0 +1,137 @@
+import { Navigate, Route, Routes } from "react-router-dom";
+import {
+  LayoutDashboard,
+  UploadCloud,
+  TrendingUp,
+  Users,
+  AlertTriangle,
+  GraduationCap,
+  FileSpreadsheet,
+  CalendarDays,
+  Award,
+  BookOpen,
+  IdCard,
+} from "lucide-react";
+import { useAuth } from "./auth/AuthContext";
+import Login from "./auth/Login";
+import PortalLayout from "./layout/PortalLayout";
+
+import AdminDashboard from "./portals/admin/AdminDashboard";
+import UploadData from "./portals/admin/UploadData";
+import PromoteCohort from "./portals/admin/PromoteCohort";
+import ImportExceptions from "./portals/admin/ImportExceptions";
+import AdminFaculty from "./portals/admin/AdminFaculty";
+
+import ProctorDashboard from "./portals/proctor/ProctorDashboard";
+import UploadResults from "./portals/proctor/UploadResults";
+import Calendar from "./portals/proctor/Calendar";
+import ActivityPointsReview from "./portals/proctor/ActivityPointsReview";
+
+import StudentDashboard from "./portals/student/StudentDashboard";
+import AcademicRecord from "./portals/student/AcademicRecord";
+import ActivityPointsStudent from "./portals/student/ActivityPointsStudent";
+import MyInfo from "./portals/student/MyInfo";
+
+import Directory from "./portals/shared/Directory";
+import StudentDetail from "./portals/shared/StudentDetail";
+
+const adminTabs = [
+  { to: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/admin/upload", label: "Upload", icon: UploadCloud },
+  { to: "/admin/promote", label: "Promote Cohort", icon: TrendingUp },
+  { to: "/admin/directory", label: "Directory", icon: Users },
+  { to: "/admin/exceptions", label: "Exceptions", icon: AlertTriangle },
+  { to: "/admin/faculty", label: "Faculty", icon: GraduationCap },
+];
+
+const proctorTabs = [
+  { to: "/proctor", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/proctor/directory", label: "Directory", icon: Users },
+  { to: "/proctor/upload", label: "Upload Results", icon: FileSpreadsheet },
+  { to: "/proctor/calendar", label: "Calendar / PTM", icon: CalendarDays },
+  { to: "/proctor/activity-points", label: "Activity Points", icon: Award },
+];
+
+const studentTabs = [
+  { to: "/student", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/student/academic-record", label: "Academic Record", icon: BookOpen },
+  { to: "/student/activity-points", label: "Activity Points", icon: Award },
+  { to: "/student/my-info", label: "My Info", icon: IdCard },
+];
+
+function HomeRedirect() {
+  const { auth } = useAuth();
+  if (!auth) return <Navigate to="/login" replace />;
+  if (auth.role === "ADMIN") return <Navigate to="/admin" replace />;
+  if (auth.role === "PROCTOR") return <Navigate to="/proctor" replace />;
+  return <Navigate to="/student" replace />;
+}
+
+function RequireRole({ role, children }: { role: "ADMIN" | "PROCTOR" | "STUDENT"; children: JSX.Element }) {
+  const { auth, loading } = useAuth();
+  if (loading) return null;
+  if (!auth) return <Navigate to="/login" replace />;
+  if (auth.role !== role) return <Navigate to="/" replace />;
+  return children;
+}
+
+export default function App() {
+  const { auth, loading } = useAuth();
+  if (loading) return null;
+
+  return (
+    <Routes>
+      <Route path="/login" element={auth ? <Navigate to="/" replace /> : <Login />} />
+      <Route path="/" element={<HomeRedirect />} />
+
+      <Route
+        path="/admin"
+        element={
+          <RequireRole role="ADMIN">
+            <PortalLayout tabs={adminTabs} portalName="Admin Portal" />
+          </RequireRole>
+        }
+      >
+        <Route index element={<AdminDashboard />} />
+        <Route path="upload" element={<UploadData />} />
+        <Route path="promote" element={<PromoteCohort />} />
+        <Route path="directory" element={<Directory role="ADMIN" />} />
+        <Route path="exceptions" element={<ImportExceptions />} />
+        <Route path="faculty" element={<AdminFaculty />} />
+        <Route path="students/:usn" element={<StudentDetail base="/admin" />} />
+      </Route>
+
+      <Route
+        path="/proctor"
+        element={
+          <RequireRole role="PROCTOR">
+            <PortalLayout tabs={proctorTabs} portalName="Proctor Portal" />
+          </RequireRole>
+        }
+      >
+        <Route index element={<ProctorDashboard />} />
+        <Route path="directory" element={<Directory role="PROCTOR" />} />
+        <Route path="upload" element={<UploadResults />} />
+        <Route path="calendar" element={<Calendar />} />
+        <Route path="activity-points" element={<ActivityPointsReview />} />
+        <Route path="students/:usn" element={<StudentDetail base="/proctor" />} />
+      </Route>
+
+      <Route
+        path="/student"
+        element={
+          <RequireRole role="STUDENT">
+            <PortalLayout tabs={studentTabs} portalName="Student Portal" />
+          </RequireRole>
+        }
+      >
+        <Route index element={<StudentDashboard />} />
+        <Route path="academic-record" element={<AcademicRecord />} />
+        <Route path="activity-points" element={<ActivityPointsStudent />} />
+        <Route path="my-info" element={<MyInfo />} />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}

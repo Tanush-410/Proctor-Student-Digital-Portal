@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+backend/prisma/dev.db*
+backend/prisma/test.db*
+backend/uploads/proofs/*
+!backend/uploads/proofs/.gitkeep
+backend/uploads/imports/*
+!backend/uploads/imports/.gitkeep
+backend/.env
+**/.git
+**/*.log

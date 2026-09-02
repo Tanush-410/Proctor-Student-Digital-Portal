@@ -1,0 +1,16 @@
+# Reverse proxy + TLS termination in front of the app container.
+#
+# Local/testing (default below): Caddy issues itself a locally-trusted
+# self-signed certificate for "localhost" — https://localhost just works,
+# no setup. Your browser may still show a warning the first time depending
+# on whether Caddy's local CA is trusted system-wide; the connection is
+# genuinely encrypted either way.
+#
+# Real deployment: replace "localhost" below with your actual domain name
+# (and point DNS at this host). Caddy then automatically obtains and
+# renews a real certificate via Let's Encrypt — no other config needed.
+localhost {
+	tls internal
+
+	reverse_proxy app:4000
+}

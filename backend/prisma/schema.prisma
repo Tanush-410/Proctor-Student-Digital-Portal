@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite has no native enum type, so the enum-like fields below (FacultyRole:
+// ADMIN|PROCTOR; SourceType: MAIN|TAL|REVAL|CHALLENGE_REVAL|SUPPLEMENTARY|
+// STUDENT_PROVISIONAL; ResultStatus: PASS|FAIL|WITHHELD|ABSENT; ClaimStatus:
+// PENDING|APPROVED|REJECTED) are plain strings, validated in the TS layer
+// (src/modules/**) instead of at the schema level.
+
+model Faculty {
+  facultyId   Int      @id @default(autoincrement()) @map("faculty_id")
+  staffId     String   @map("staff_id")
+  name        String
+  shortCode   String   @unique @map("short_code")
+  cabinNo     String?  @map("cabin_no")
+  telecomNo   String?  @map("telecom_no")
+  phone       String?
+  email       String   @unique
+  role        String   @default("PROCTOR")
+
+  proctees        Student[]             @relation("ProctorStudents")
+  ptmRecords      PtmRecord[]
+  claimsReviewed  ActivityPointClaim[]  @relation("ClaimReviewer")
+  importBatches   ImportBatch[]
+  resultsUploaded ResultRecord[]        @relation("ResultUploader")
+
+  @@map("faculty")
+}
+
+model Student {
+  usn               String   @id
+  name               String
+  section             String?
+  admissionYear       Int      @map("admission_year")
+  currentSemester    Int      @default(1) @map("current_semester")
+  proctorId           Int?     @map("proctor_id")
+  quota                String?
+  fatherName         String?  @map("father_name")
+  fatherPhone        String?  @map("father_phone")
+  motherName         String?  @map("mother_name")
+  motherPhone        String?  @map("mother_phone")
+  localAddress       String?  @map("local_address")
+  localGuardianName  String?  @map("local_guardian_name")
+  localGuardianPhone String?  @map("local_guardian_phone")
+  email                String   @unique
+
+  proctor  Faculty?             @relation("ProctorStudents", fields: [proctorId], references: [facultyId])
+  results  ResultRecord[]
+  claims   ActivityPointClaim[]
+
+  @@map("student")
+}
+
+model ResultRecord {
+  resultId      Int        @id @default(autoincrement()) @map("result_id")
+  usn           String
+  subjectCode   String     @map("subject_code")
+  subjectName   String?    @map("subject_name")
+  semester      Int
+  sourceType    String     @map("source_type")
+  internalMarks Int?       @map("internal_marks")
+  externalMarks Int?       @map("external_marks")
+  totalMarks    Int?       @map("total_marks")
+  credits       Int        @default(0)
+  grade         String?
+  status        String     @default("PASS")
+  proofFile     String?    @map("proof_file")
+  uploadedBy    Int?       @map("uploaded_by")
+  uploadedAt    DateTime   @default(now()) @map("uploaded_at")
+
+  student  Student  @relation(fields: [usn], references: [usn])
+  uploader Faculty? @relation("ResultUploader", fields: [uploadedBy], references: [facultyId])
+
+  @@map("result_record")
+}
+
+model ActivityPointClaim {
+  claimId         Int         @id @default(autoincrement()) @map("claim_id")
+  usn             String
+  proctorId       Int?        @map("proctor_id")
+  proofFile       String?     @map("proof_file")
+  description     String
+  requestedPoints Int         @map("requested_points")
+  grantedPoints   Int?        @map("granted_points")
+  status          String      @default("PENDING")
+  remarks         String?
+  submittedAt     DateTime    @default(now()) @map("submitted_at")
+  reviewedAt      DateTime?   @map("reviewed_at")
+
+  student  Student  @relation(fields: [usn], references: [usn])
+  reviewer Faculty? @relation("ClaimReviewer", fields: [proctorId], references: [facultyId])
+
+  @@map("activity_point_claim")
+}
+
+model PtmRecord {
+  ptmId     Int      @id @default(autoincrement()) @map("ptm_id")
+  proctorId Int      @map("proctor_id")
+  ptmDate   String   @map("ptm_date")
+  ptmTime   String   @map("ptm_time")
+  notes     String?
+
+  proctor Faculty @relation(fields: [proctorId], references: [facultyId])
+
+  @@map("ptm_record")
+}
+
+model ImportBatch {
+  batchId    Int      @id @default(autoincrement()) @map("batch_id")
+  uploadedBy Int      @map("uploaded_by")
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+  sourceType String   @map("source_type")
+  rowCount   Int      @default(0) @map("row_count")
+  errorCount Int      @default(0) @map("error_count")
+
+  uploader   Faculty           @relation(fields: [uploadedBy], references: [facultyId])
+  exceptions ImportException[]
+
+  @@map("import_batch")
+}
+
+// Not part of the original ER diagram (Figure 4), which only logs ImportBatch
+// metadata. Added so unmatched rows are queryable ("no student is silently
+// lost", Section 4.2) rather than only reported once in the upload response.
+model ImportException {
+  id         Int      @id @default(autoincrement())
+  batchId    Int      @map("batch_id")
+  rowNumber  Int      @map("row_number")
+  rawData    String   @map("raw_data")
+  reason     String
+  resolved   Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  batch ImportBatch @relation(fields: [batchId], references: [batchId])
+
+  @@map("import_exception")
+}
+
+model OtpRequest {
+  id        Int      @id @default(autoincrement())
+  email     String
+  code      String
+  expiresAt DateTime @map("expires_at")
+  consumed  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("otp_request")
+}
+
+model Session {
+  token     String   @id
+  email     String
+  role      String
+  facultyId Int?     @map("faculty_id")
+  usn       String?
+  createdAt DateTime @default(now()) @map("created_at")
+  expiresAt DateTime @map("expires_at")
+
+  @@map("session")
+}

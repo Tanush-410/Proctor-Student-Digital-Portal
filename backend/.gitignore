@@ -1,0 +1,11 @@
+node_modules/
+dist/
+dev.db
+dev.db-journal
+test.db
+test.db-journal
+uploads/proofs/*
+!uploads/proofs/.gitkeep
+uploads/imports/*
+!uploads/imports/.gitkeep
+.env
