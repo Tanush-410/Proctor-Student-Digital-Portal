@@ -28,8 +28,9 @@ services:
         sync: false
       - key: UPLOADS_DIR
         value: /data/uploads
-      # Real OTP e-mail delivery. Without these, login codes only appear in the
-      # Render logs (Logs tab) — fine for testing, not for real users.
+      # Real OTP e-mail delivery. Without these, a production login code is
+      # written only to the `otp_request` table in Supabase (not the response,
+      # not the logs) — read it from the Table Editor, or set these to e-mail it.
       # - key: SMTP_HOST
       #   sync: false
       # - key: SMTP_PORT
