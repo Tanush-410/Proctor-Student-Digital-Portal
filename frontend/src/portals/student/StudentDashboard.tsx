@@ -4,6 +4,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { api } from "../../api/client";
 import { Avatar, Badge, Card, CardHeader, EmptyState, Skeleton, StatTile } from "../../components/ui";
 import { BarChart, LineChart } from "../../components/charts";
+import { DashboardHero } from "../../components/DashboardHero";
 
 interface Proctor {
   name: string;
@@ -75,10 +76,11 @@ export default function StudentDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-slate-900">Welcome, {firstName}</h1>
-        <p className="mt-1 text-sm text-slate-500">Your academic snapshot, at a glance.</p>
-      </div>
+      <DashboardHero
+        eyebrow="BMS College of Engineering — Student Portal"
+        title={`Welcome, ${firstName}`}
+        subtitle="Your academic snapshot, at a glance."
+      />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatTile label="CGPA" value={cgpa ?? "N/A"} tone="blue" icon={GraduationCap} loading={cgpa === null} />

@@ -6,6 +6,7 @@ import { api, ApiError } from "../../api/client";
 import { useToast } from "../../components/Toast";
 import { Modal } from "../../components/Modal";
 import { Avatar, Badge, Button, Card, CardHeader, EmptyState, Input, Label, SkeletonRows, StatTile, Textarea } from "../../components/ui";
+import { DashboardHero } from "../../components/DashboardHero";
 
 interface StudentRow {
   usn: string;
@@ -128,10 +129,11 @@ export default function ProctorDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-slate-900">Welcome back, {firstName}</h1>
-        <p className="mt-1 text-sm text-slate-500">Your proctees and what needs your attention.</p>
-      </div>
+      <DashboardHero
+        eyebrow="BMS College of Engineering — Proctor Portal"
+        title={`Welcome back, ${firstName}`}
+        subtitle="Your proctees and what needs your attention."
+      />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         <StatTile label="Proctees" value={students?.length ?? 0} tone="blue" icon={Users} loading={students === null} />

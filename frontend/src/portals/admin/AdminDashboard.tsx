@@ -4,6 +4,7 @@ import { AlertTriangle, GraduationCap, History, Users } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { api } from "../../api/client";
 import { Badge, Card, CardHeader, EmptyState, SkeletonRows, StatTile } from "../../components/ui";
+import { DashboardHero } from "../../components/DashboardHero";
 
 interface Batch {
   batchId: number;
@@ -32,10 +33,11 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-slate-900">Welcome back, {firstName}</h1>
-        <p className="mt-1 text-sm text-slate-500">Department-wide overview across ingestion, results, and proctee allocation.</p>
-      </div>
+      <DashboardHero
+        eyebrow="BMS College of Engineering — HOD Portal"
+        title={`Welcome back, ${firstName}`}
+        subtitle="Department-wide overview across ingestion, results, and proctee allocation."
+      />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <StatTile label="Students" value={studentCount ?? 0} tone="blue" icon={GraduationCap} loading={studentCount === null} />
