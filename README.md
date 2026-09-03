@@ -61,8 +61,8 @@ Or manually, in two terminals:
 # 1. Backend — http://localhost:4000
 cd backend
 npm install
-npx prisma migrate dev   # first run only; creates dev.db
-npm run seed             # loads sample Admin/Proctor/Student accounts
+npx prisma migrate dev   # first run only
+npm run seed             # loads the real cohort (Shuba V Rao + PN/MVM + 70 students)
 npm run dev
 
 # 2. Frontend — http://localhost:5173
@@ -71,44 +71,41 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. Log in with any seeded e-mail below; the OTP screen shows the
+Open http://localhost:5173. Log in with a seeded e-mail below; the OTP screen shows the
 code directly (dev mode has no mail service configured).
 
 | Role    | E-mail                        |
 |---------|--------------------------------|
-| Admin   | hod.cse@bmsce.ac.in            |
-| Proctor | anjali.rao@bmsce.ac.in         |
-| Proctor | sunil.kumar@bmsce.ac.in        |
-| Student | aarav.sharma@bmsce.ac.in       |
-| Student | diya.nair@bmsce.ac.in          |
-| Student | kabir.patel@bmsce.ac.in        |
-| Student | meera.krishnan@bmsce.ac.in     |
+| Admin (HOD) | shuba.rao@bmsce.ac.in     |
+| Proctor | praveen.cse@bmsce.ac.in        |
+| Proctor | megavalli.cse@bmsce.ac.in      |
+| Student | any of the 70 — e.g. `moulyas.cs24@bmsce.ac.in`, `tanmayatmakur...` (see the Directory) |
 
-`diya.nair@bmsce.ac.in` is seeded to demonstrate the precedence engine end-to-end: a
-provisional self-entry that disagrees with the eventual official result (discrepancy flag), and
-a subject that failed on `MAIN` and was cleared via `SUPPLEMENTARY`.
+`npm run seed` loads `prisma/data/cohort.json`: HOD Shuba V Rao, proctors Praveen N and
+Megavalli M, their **70 students** (with admission details), and **372** 4th-sem result records.
+It's the actual data the live app runs on, so this repository **must stay private** — it
+contains real student PII. The snapshot is regenerated from the department source spreadsheets +
+the hand-verified marks (`prisma/data/resultsData.ts`) by `npm run seed:build`; the marks are
+OCR-assisted from a scanned provisional sheet and subject credits are assumed, so verify against
+official records before relying on SGPA/CGPA.
 
 As Admin, use the **Faculty** tab to onboard new proctors — there's no other way to add one
-short of editing `prisma/seed.ts`.
+short of editing the seed.
 
-### Real cohort data (proctors PN + MVM)
+### Demo data (7 fake accounts)
 
 ```bash
 cd backend
-npm run seed:real   # loads prisma/data/cohort.json into DATABASE_URL (full reset)
+npm run seed:demo   # Ramesh Iyer (Admin) + 2 proctors + 4 students, all fictional
 ```
 
-`prisma/data/cohort.json` is the actual data behind the live app: HOD Shuba V Rao, proctors
-Praveen N (`praveen.cse@bmsce.ac.in`) and Megavalli M (`megavalli.cse@bmsce.ac.in`), their 70
-students (with admission details), and 372 4th-sem result records. It contains **real student
-PII, so this repository must stay private.** The snapshot is regenerated from the department
-source spreadsheets + the hand-verified result marks (`prisma/data/resultsData.ts`) by
-`npm run seed:real:build` — the marks are OCR-assisted from a scanned provisional sheet and
-subject credits are assumed, so verify against the official records before relying on SGPA/CGPA.
+`prisma/seed.ts` is a tiny hand-authored dataset for a quick look without the real cohort.
+`diya.nair@bmsce.ac.in` there demonstrates the precedence engine end-to-end (a provisional
+self-entry that disagrees with the official result, and a `MAIN` fail cleared via `SUPPLEMENTARY`).
 
 ### Seeding at scale (100 faculty, 3000 students)
 
-`prisma/seed.ts` above is a small hand-authored demo (7 accounts) — good for a quick look.
+`prisma/seed.ts` is a small hand-authored demo (7 accounts) — good for a quick look.
 `prisma/seedScale.ts` generates a much larger, realistic dataset instead: 100 faculty (5 Admin,
 95 Proctor), 3000 students across four admission cohorts (2022–2025), each with a full result
 history for **every** semester from admission through their current one — not just their latest
@@ -186,7 +183,7 @@ no Caddy needed, Render terminates TLS itself.
 
 The `disk:` block (persistent storage for uploaded proof files) needs a paid
 instance; on the free plan, delete that block — proof files then reset on each
-redeploy, nothing else changes. `npm run seed:real` needs dev dependencies
+redeploy, nothing else changes. `npm run seed` needs dev dependencies
 (`tsx`), so run it from a laptop pointed at the database, not the Render shell.
 
 Railway / Fly.io work the same way (they build the Dockerfile) — set the same
