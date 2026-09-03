@@ -10,6 +10,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init",
     "seed": "tsx prisma/seed.ts",
+    "seed:real": "tsx prisma/seedReal.ts",
+    "seed:real:build": "tsx prisma/data/buildCohort.ts",
     "bootstrap-admin": "node dist/scripts/bootstrapAdmin.js",
     "test": "bash scripts/test.sh",
     "seed:scale": "tsx prisma/seedScale.ts"

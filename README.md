@@ -91,6 +91,21 @@ a subject that failed on `MAIN` and was cleared via `SUPPLEMENTARY`.
 As Admin, use the **Faculty** tab to onboard new proctors — there's no other way to add one
 short of editing `prisma/seed.ts`.
 
+### Real cohort data (proctors PN + MVM)
+
+```bash
+cd backend
+npm run seed:real   # loads prisma/data/cohort.json into DATABASE_URL (full reset)
+```
+
+`prisma/data/cohort.json` is the actual data behind the live app: HOD Shuba V Rao, proctors
+Praveen N (`praveen.cse@bmsce.ac.in`) and Megavalli M (`megavalli.cse@bmsce.ac.in`), their 70
+students (with admission details), and 372 4th-sem result records. It contains **real student
+PII, so this repository must stay private.** The snapshot is regenerated from the department
+source spreadsheets + the hand-verified result marks (`prisma/data/resultsData.ts`) by
+`npm run seed:real:build` — the marks are OCR-assisted from a scanned provisional sheet and
+subject credits are assumed, so verify against the official records before relying on SGPA/CGPA.
+
 ### Seeding at scale (100 faculty, 3000 students)
 
 `prisma/seed.ts` above is a small hand-authored demo (7 accounts) — good for a quick look.
