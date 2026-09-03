@@ -8,9 +8,10 @@ activity-points claim/review lifecycle.
 
 ## Stack
 
-- **Backend**: Node.js + TypeScript + Express + Prisma ORM + SQLite. OTP auth over an httpOnly
-  session cookie — sent by real e-mail when SMTP is configured, and in local dev only (never in
-  production) also echoed in the API response so you don't need a mail server to test with.
+- **Backend**: Node.js + TypeScript + Express + Prisma ORM + Postgres (hosted on Supabase). OTP
+  auth over an httpOnly session cookie — sent by real e-mail when SMTP is configured, and in
+  local dev only (never in production) also echoed in the API response so you don't need a mail
+  server to test with.
 - **Frontend**: React + TypeScript + Vite + Tailwind CSS + React Router.
 
 All API routes live under `/api/*` on the backend. In dev, the Vite server proxies `/api/*`
@@ -42,6 +43,10 @@ frontend/
 ```
 
 ## Running it locally
+
+Create a free [Supabase](https://supabase.com) project, then copy `backend/.env.example` to
+`backend/.env` and fill in `DATABASE_URL` (pooled, :6543) and `DIRECT_URL` (direct, :5432) from
+its Project Settings -> Database -> Connection string page.
 
 From the repo root:
 
@@ -113,11 +118,14 @@ guaranteed — not random — pattern to point a demo at:
 | `meera.krishnan@bmsce.ac.in` | Shorter history — only through semester 5 |
 | `anjali.rao@bmsce.ac.in` | Proctor for ~34 students, including the three above |
 
-Verified against the running app after generating it (not just the seed script's own output):
-`GET /students/count` and `GET /proctors/count` both resolve in single-digit milliseconds, a
-directory search over 3000 students returns in under 10ms, and a PDF report for a 7-semester
-student generates in ~30ms — see "Design decisions" below for the pagination/count-endpoint
-changes that made the first of those true.
+Verified against the running app after generating it, back when this ran on SQLite (not just
+the seed script's own output): `GET /students/count` and `GET /proctors/count` both resolved
+in single-digit milliseconds, a directory search over 3000 students returned in under 10ms, and
+a PDF report for a 7-semester student generated in ~30ms — see "Design decisions" below for the
+pagination/count-endpoint changes that made the first of those true. **Not yet re-measured
+against Supabase** — a remote Postgres connection adds real network round-trip latency that a
+local SQLite file never had, so re-run this check once you're pointed at your Supabase project
+rather than assuming the same numbers hold.
 
 ## Tests
 
@@ -126,8 +134,9 @@ cd backend
 npm test
 ```
 
-Runs against a dedicated `prisma/test.db` (wiped and recreated on every run — never the dev
-database), covering:
+Runs against a dedicated Postgres database (`TEST_DATABASE_URL` in `backend/.env`, wiped and
+recreated on every run via `prisma db push --force-reset` — never the dev database, see
+`backend/.env.example`), covering:
 - The results-precedence engine and the ingestion pipeline in isolation (`vitest` unit tests).
 - Auth, RBAC, the results/activity-points/ingestion HTTP flows, and OTP rate limiting end-to-end
   against the real Express app (`supertest` integration tests).
@@ -162,10 +171,12 @@ Caddy self-signs a locally-trusted certificate for `localhost` with no setup. Fo
 deployment, edit `Caddyfile` and replace `localhost` with your actual domain; Caddy then obtains
 and renews a real Let's Encrypt certificate automatically.
 
-The `app` container's data — the SQLite database and uploaded proof files — lives in a named
-volume (`proctor-diary-data`) mounted at `/data`, surviving container restarts/redeploys. On
-every start, the container runs `prisma migrate deploy` against that volume before the server
-starts, so schema upgrades on redeploy are automatic and safe.
+The database lives in Supabase, not in this container — `DATABASE_URL`/`DIRECT_URL` in a `.env`
+file at the repo root (see `.env.example`; docker compose loads it automatically) point the app
+at your Supabase project. Only uploaded proof files live in the container's own named volume
+(`proctor-diary-uploads`, mounted at `/data`), surviving container restarts/redeploys. On every
+start, the container runs `prisma migrate deploy` against Supabase before the server starts, so
+schema upgrades on redeploy are automatic and safe.
 
 **A fresh deployment has zero user accounts** — OTP login only works for an e-mail that already
 has a Faculty/Student row, so there's no way to log in until one exists. Bootstrap the first
@@ -196,25 +207,30 @@ while building this, not just written and assumed to work.
 | Variable | Purpose | Default |
 |---|---|---|
 | `PORT` | Port the server listens on | `4000` |
-| `DATABASE_URL` | SQLite file — use an **absolute** path so it lands in the mounted volume, e.g. `file:/data/app.db` | `file:./dev.db` (relative to `prisma/`, dev only) |
-| `UPLOADS_DIR` | Where proof-file uploads are written — also point this into the volume, e.g. `/data/uploads` | `backend/uploads` |
+| `DATABASE_URL` | Supabase Postgres, pooled connection (pgbouncer, `:6543`) — what the app queries at runtime | none — required |
+| `DIRECT_URL` | Supabase Postgres, direct connection (`:5432`) — used only by `prisma migrate deploy`/`dev` | none — required |
+| `UPLOADS_DIR` | Where proof-file uploads are written — point this into the volume, e.g. `/data/uploads` | `backend/uploads` |
 | `CORS_ORIGIN` | Only relevant if the frontend is ever hosted separately from the API | `http://localhost:5173` |
 | `NODE_ENV` | `production` turns on serving the built frontend, HTTPS enforcement, and Secure cookies | — |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Real OTP e-mail delivery (`lib/mailer.ts`) — without these, OTPs only ever reach the server's own logs | unset |
 
 **What this doesn't include, deliberately:**
-- **Backups.** It's one SQLite file plus a folder of uploads, both in the `proctor-diary-data`
-  volume — back that up on whatever schedule matters to you (`docker run --rm -v
-  proctor-diary-data:/data -v $(pwd):/backup alpine tar czf /backup/backup.tgz /data` is enough
-  for a single-node setup like this).
-- **Horizontal scaling.** SQLite is single-writer; this is a single-container deployment. Fine
-  for a department-scale app, not for multiple app instances behind a load balancer.
+- **Database backups.** Supabase takes daily backups automatically on its paid plans (the free
+  tier does not include them) — check your project's plan and set up point-in-time recovery if
+  you need it. This is now Supabase's responsibility, not this app's.
+- **Uploaded proof files.** Still local disk, in the `proctor-diary-uploads` volume — back that
+  up on whatever schedule matters to you (`docker run --rm -v proctor-diary-uploads:/data -v
+  $(pwd):/backup alpine tar czf /backup/backup.tgz /data`).
+- **Horizontal scaling of the app itself.** Postgres removes the SQLite single-writer ceiling,
+  but this is still a single-container deployment: OTP/rate limiting (`lib/rateLimiter.ts`) is
+  in-memory per process, so it wouldn't coordinate correctly across multiple app instances
+  without moving that state somewhere shared (e.g. Redis) first.
 
 ### Without Docker
 
 ```bash
 npm run build   # builds frontend/dist, then compiles the backend
-NODE_ENV=production DATABASE_URL="file:/absolute/path/to/app.db" npm start
+NODE_ENV=production DATABASE_URL="<supabase pooled url>" DIRECT_URL="<supabase direct url>" npm start
 ```
 
 `npm start` runs `node backend/dist/index.js`, which serves the API and the built frontend from
@@ -299,14 +315,17 @@ and the thing the original test suite was built around proving.
   available while building this. Every security fix above was verified against the real running
   HTTP API (and, for the Docker path, through actual Caddy-terminated HTTPS with a real cookie
   jar) — not against what it looks like or behaves like when clicked through by a human.
-- **Physical/infrastructure security** (who has SSH access to the host, how the SQLite volume
-  itself is protected at rest, etc.) — outside what an application-layer pass can address.
+- **Physical/infrastructure security** (who has SSH access to the app host, who has access to
+  the Supabase project/dashboard, how the uploads volume is protected at rest, etc.) — outside
+  what an application-layer pass can address.
 
 ## Design decisions worth knowing about
 
-- **SQLite has no native enum type** — fields modelled as enums in Section 5 (`source_type`,
-  `status`, claim `status`, faculty `role`) are plain strings in the schema, validated in the
-  TypeScript layer instead (`src/modules/**`).
+- **Enum-like fields are plain strings, not native Postgres enums** — fields modelled as enums
+  in Section 5 (`source_type`, `status`, claim `status`, faculty `role`) are plain strings in
+  the schema, validated in the TypeScript layer instead (`src/modules/**`). Postgres does
+  support native enums (SQLite, the original datastore here, didn't) — kept as strings anyway
+  so the Supabase migration was a pure database swap, not also a schema redesign.
 - **Exception queue is persisted**, not just returned once in the upload response (`ImportException`
   model) — this wasn't in the original ER diagram, but Section 4.2's "no student is silently
   lost" only holds if unmatched rows stay queryable after the upload response is gone.
@@ -335,6 +354,10 @@ and the thing the original test suite was built around proving.
   container startup, not build time — the kind of failure that only shows up after you've already
   deployed. Both stages use the same Alpine base specifically so the engine picked at build time
   matches what's actually present at runtime.
+- **Search is explicitly case-insensitive** (`mode: "insensitive"` on every `contains` filter in
+  faculty search, student search, and directory search) — SQLite's `contains` was
+  case-insensitive by default, Postgres's isn't; this was added when moving to Supabase so
+  search behavior didn't silently change along with the database.
 - **Counts, not full lists, for dashboard stat tiles.** `GET /students/count` and
   `GET /proctors/count` exist specifically because the Admin dashboard used to fetch the entire
   students/faculty table just to read `.length` — invisible at 7 students, a real cost at 3000.
@@ -350,9 +373,10 @@ and the thing the original test suite was built around proving.
   HTTPS with a real cookie jar) and the frontend build/typecheck passes clean, but a manual
   click-through is worth doing before you rely on it.
 - **Backups are on you** — see the Deployment section above for what to do about it.
-- SQLite is single-writer, so this is a single-container/single-node deployment story, not a
-  horizontally-scaled one — an appropriate trade-off at department scale, not at
-  university-wide scale.
+- The app itself is still single-container (see "Horizontal scaling of the app itself" in
+  Deployment above) — Postgres/Supabase removes the database-side ceiling SQLite had, but
+  in-memory rate limiting means running multiple app instances isn't safe yet without moving
+  that state somewhere shared first.
 - PTM scheduling/slot assignment/parent notification, attendance ingestion, and AICTE
   activity-point category ceilings are explicitly out of scope per the design doc's Section 13 —
   not gaps, just flagged so they aren't mistaken for oversights.

@@ -3,15 +3,24 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Pooled connection (pgbouncer, port 6543) — what the running app uses for
+  // ordinary queries. Supabase gives you this string on the project's
+  // Database Settings page ("Connection pooling").
+  url       = env("DATABASE_URL")
+  // Direct connection (port 5432) — Prisma Migrate needs this because
+  // pgbouncer's transaction pooling mode doesn't support the prepared
+  // statements migrations rely on. Same page, "Connection string" (non-pooled).
+  directUrl = env("DIRECT_URL")
 }
 
-// SQLite has no native enum type, so the enum-like fields below (FacultyRole:
+// Postgres has a native enum type, but the enum-like fields below (FacultyRole:
 // ADMIN|PROCTOR; SourceType: MAIN|TAL|REVAL|CHALLENGE_REVAL|SUPPLEMENTARY|
 // STUDENT_PROVISIONAL; ResultStatus: PASS|FAIL|WITHHELD|ABSENT; ClaimStatus:
-// PENDING|APPROVED|REJECTED) are plain strings, validated in the TS layer
-// (src/modules/**) instead of at the schema level.
+// PENDING|APPROVED|REJECTED) are kept as plain strings, validated in the TS
+// layer (src/modules/**) instead — carried over unchanged from the SQLite
+// schema (which had no native enum type) to keep this migration a pure
+// database swap rather than also touching validation logic.
 
 model Faculty {
   facultyId   Int      @id @default(autoincrement()) @map("faculty_id")

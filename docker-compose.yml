@@ -6,13 +6,22 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4000
-      DATABASE_URL: "file:/data/app.db"
+      # Supabase Postgres connection strings — set these in a .env file next
+      # to this docker-compose.yml (docker compose loads it automatically;
+      # see backend/.env.example). DATABASE_URL is the pooled (pgbouncer,
+      # :6543) string the app uses at runtime; DIRECT_URL is the non-pooled
+      # (:5432) string `prisma migrate deploy` uses on container start.
+      DATABASE_URL: "${DATABASE_URL}"
+      DIRECT_URL: "${DIRECT_URL}"
       UPLOADS_DIR: "/data/uploads"
       # Same-origin in production (Caddy fronts everything on one host), so
       # this is only relevant if you split the frontend out to its own origin.
       CORS_ORIGIN: "https://localhost"
     volumes:
-      - proctor-diary-data:/data
+      # Only uploaded proof files now — the database itself lives in
+      # Supabase, not in this volume. Still needed so proof files survive a
+      # container restart/redeploy.
+      - proctor-diary-uploads:/data
     restart: unless-stopped
     # Not published to the host — only Caddy talks to this container
     # directly. The app enforces HTTPS and Secure cookies in production
@@ -36,6 +45,6 @@ services:
     restart: unless-stopped
 
 volumes:
-  proctor-diary-data:
+  proctor-diary-uploads:
   caddy-data:
   caddy-config:

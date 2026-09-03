@@ -44,7 +44,7 @@ const server = app.listen(PORT, () => console.log(`Proctor Diary API listening o
 
 // Containers stop with SIGTERM, not Ctrl-C — without this, in-flight requests
 // (a large sheet upload, a PDF being streamed) get killed mid-response instead
-// of finishing, and the SQLite connection never closes cleanly.
+// of finishing, and Prisma's Postgres connection pool never closes cleanly.
 function shutdown(signal: string) {
   console.log(`[shutdown] received ${signal}, closing server...`);
   server.close(async () => {
