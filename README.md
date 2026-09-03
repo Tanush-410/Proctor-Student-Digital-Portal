@@ -170,6 +170,28 @@ regression test:
 
 ## Deployment
 
+### Render (managed, via `render.yaml`)
+
+The repo ships a Render Blueprint that runs the Dockerfile as one web service —
+no Caddy needed, Render terminates TLS itself.
+
+1. **render.com → New → Blueprint**, connect this repo, branch `tanimies`.
+2. Render reads `render.yaml` and prompts for `DATABASE_URL` and `DIRECT_URL` —
+   paste the Supabase strings (Project → Connect → ORMs → Prisma).
+3. Deploy. On start the container runs `prisma migrate deploy`; the data is
+   already in Supabase, so no seeding.
+4. **Logging in:** with no `SMTP_*` set, OTP codes appear only in the Render
+   **Logs** tab. For real users, uncomment the `SMTP_*` block in `render.yaml`
+   and fill it in.
+
+The `disk:` block (persistent storage for uploaded proof files) needs a paid
+instance; on the free plan, delete that block — proof files then reset on each
+redeploy, nothing else changes. `npm run seed:real` needs dev dependencies
+(`tsx`), so run it from a laptop pointed at the database, not the Render shell.
+
+Railway / Fly.io work the same way (they build the Dockerfile) — set the same
+env vars and mount a volume at `/data`.
+
 ### Docker (recommended)
 
 ```bash
