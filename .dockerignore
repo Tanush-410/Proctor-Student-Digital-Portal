@@ -7,5 +7,6 @@ backend/uploads/proofs/*
 backend/uploads/imports/*
 !backend/uploads/imports/.gitkeep
 backend/.env
+.env
 **/.git
 **/*.log

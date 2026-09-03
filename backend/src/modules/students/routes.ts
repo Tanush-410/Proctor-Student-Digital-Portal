@@ -21,7 +21,7 @@ studentsRouter.get("/", requireAuth, requireRole("ADMIN", "PROCTOR"), async (req
   const mineOnly = req.query.mine === "true";
   const where: any = {};
   if (mineOnly && req.auth!.role === "PROCTOR") where.proctorId = req.auth!.facultyId;
-  if (q) where.OR = [{ name: { contains: q } }, { usn: { contains: q } }];
+  if (q) where.OR = [{ name: { contains: q, mode: "insensitive" } }, { usn: { contains: q, mode: "insensitive" } }];
 
   const limit = Math.min(parseInt(String(req.query.limit ?? "100"), 10) || 100, 500);
   const offset = Math.max(parseInt(String(req.query.offset ?? "0"), 10) || 0, 0);

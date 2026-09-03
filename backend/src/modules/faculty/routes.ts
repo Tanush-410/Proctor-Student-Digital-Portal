@@ -17,7 +17,13 @@ facultyRouter.get("/proctors", requireAuth, requireRole("ADMIN", "PROCTOR", "STU
   const q = (req.query.q as string | undefined)?.trim();
   const faculty = await prisma.faculty.findMany({
     where: q
-      ? { OR: [{ name: { contains: q } }, { shortCode: { contains: q } }, { email: { contains: q } }] }
+      ? {
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { shortCode: { contains: q, mode: "insensitive" } },
+            { email: { contains: q, mode: "insensitive" } },
+          ],
+        }
       : undefined,
     orderBy: { name: "asc" },
   });
@@ -102,8 +108,14 @@ facultyRouter.get("/directory/search", requireAuth, requireRole("ADMIN", "PROCTO
   if (!q) return res.json({ faculty: [], students: [] });
 
   const [faculty, students] = await Promise.all([
-    prisma.faculty.findMany({ where: { OR: [{ name: { contains: q } }, { shortCode: { contains: q } }] }, take: DIRECTORY_SEARCH_LIMIT }),
-    prisma.student.findMany({ where: { OR: [{ name: { contains: q } }, { usn: { contains: q } }] }, take: DIRECTORY_SEARCH_LIMIT }),
+    prisma.faculty.findMany({
+      where: { OR: [{ name: { contains: q, mode: "insensitive" } }, { shortCode: { contains: q, mode: "insensitive" } }] },
+      take: DIRECTORY_SEARCH_LIMIT,
+    }),
+    prisma.student.findMany({
+      where: { OR: [{ name: { contains: q, mode: "insensitive" } }, { usn: { contains: q, mode: "insensitive" } }] },
+      take: DIRECTORY_SEARCH_LIMIT,
+    }),
   ]);
   res.json({ faculty, students });
 });
