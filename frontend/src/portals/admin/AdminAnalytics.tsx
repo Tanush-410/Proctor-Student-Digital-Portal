@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, GraduationCap, Layers, Users, XCircle } from "lucide-react";
+import { AlertTriangle, CalendarCheck, GraduationCap, Layers, Users, XCircle } from "lucide-react";
 import { api } from "../../api/client";
 import { Card, CardHeader, PageSpinner, StatTile } from "../../components/ui";
 import { BarChart } from "../../components/charts";
@@ -21,11 +21,21 @@ interface Analytics extends GroupStat {
   bySemester: SemesterStat[];
 }
 
+interface AttendanceAnalytics {
+  from: string;
+  to: string;
+  recordCount: number;
+  overallPercentage: number | null;
+  bySection: { section: string; percentage: number | null; recordCount: number }[];
+}
+
 export default function AdminAnalytics() {
   const [data, setData] = useState<Analytics | null>(null);
+  const [attendance, setAttendance] = useState<AttendanceAnalytics | null>(null);
 
   useEffect(() => {
     api.get("/admin/analytics").then(setData);
+    api.get("/admin/attendance/analytics").then(setAttendance);
   }, []);
 
   if (!data) return <PageSpinner />;
@@ -95,6 +105,24 @@ export default function AdminAnalytics() {
           </table>
         </div>
       </Card>
+
+      {attendance && (
+        <Card>
+          <CardHeader title="Attendance — Last 30 Days" subtitle={`${attendance.recordCount} record(s) marked, ${attendance.from} to ${attendance.to}.`} icon={CalendarCheck} />
+          {attendance.bySection.length === 0 ? (
+            <p className="px-5 py-8 text-center text-sm text-slate-400">No attendance marked in this window yet.</p>
+          ) : (
+            <>
+              <div className="px-5 py-5">
+                <BarChart bars={attendance.bySection.map((s) => ({ label: s.section, value: s.percentage ?? 0, color: (s.percentage ?? 0) < 75 ? "#dc2626" : "#00519c" }))} max={100} height={180} valueSuffix="%" />
+              </div>
+              <div className="border-t border-slate-100 px-5 py-3 text-sm text-slate-600">
+                Overall: <span className="font-semibold text-slate-800">{attendance.overallPercentage ?? "N/A"}%</span>
+              </div>
+            </>
+          )}
+        </Card>
+      )}
 
       <Card>
         <CardHeader title="By Section" icon={Layers} />

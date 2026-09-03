@@ -43,6 +43,7 @@ beforeAll(async () => {
   await prisma.importException.deleteMany();
   await prisma.importBatch.deleteMany();
   await prisma.activityPointClaim.deleteMany();
+  await prisma.attendanceRecord.deleteMany();
   await prisma.studentNote.deleteMany();
   await prisma.ptmRecord.deleteMany();
   await prisma.resultRecord.deleteMany();
@@ -248,6 +249,64 @@ beforeAll(async () => {
   });
   await prisma.resultRecord.create({
     data: { usn: "1TEST22CS001", subjectCode: "CS52", semester: 5, sourceType: "SUPPLEMENTARY", grade: "C", status: "PASS", totalMarks: 50, credits: 3, uploadedBy: proctorAId },
+  });
+
+  // Fresh, single-use accounts for the scan-source-file and attendance
+  // tests — same reasoning as every other "dedicated account" comment above:
+  // several existing test.* accounts are already at the 5-per-10-min OTP
+  // request budget.
+  const scanSrcProctor = await prisma.faculty.create({
+    data: { staffId: "T082", name: "Test ScanSrc Proctor", shortCode: "TSP", email: "test.scansrc.proctor@bmsce.ac.in", role: "PROCTOR" },
+  });
+  await prisma.faculty.create({
+    data: { staffId: "T081", name: "Test ScanSrc Blocked", shortCode: "TSB", email: "test.scansrc.blocked@bmsce.ac.in", role: "PROCTOR" },
+  });
+  await prisma.faculty.create({
+    data: { staffId: "T080", name: "Test ScanSrc Admin", shortCode: "TSA", email: "test.scansrc.admin@bmsce.ac.in", role: "ADMIN" },
+  });
+  await prisma.student.create({
+    data: {
+      usn: "1SRC22CS001",
+      name: "Test ScanSrc Student",
+      admissionYear: 2023,
+      // Deliberately semester 7 — the scan-import test elsewhere in this
+      // file uses semester 3, the same tier the Department-wide analytics
+      // fixtures rely on for an exact studentCount assertion.
+      currentSemester: 7,
+      proctorId: scanSrcProctor.facultyId,
+      email: "test.scansrc.student1@bmsce.ac.in",
+    },
+  });
+
+  const attProctor = await prisma.faculty.create({
+    data: { staffId: "T079", name: "Test Attendance Proctor", shortCode: "TAP", email: "test.att.proctor@bmsce.ac.in", role: "PROCTOR" },
+  });
+  await prisma.faculty.create({
+    data: { staffId: "T078", name: "Test Attendance Blocked", shortCode: "TAB2", email: "test.att.blocked@bmsce.ac.in", role: "PROCTOR" },
+  });
+  await prisma.faculty.create({
+    data: { staffId: "T077", name: "Test Attendance Admin", shortCode: "TAA", email: "test.att.admin@bmsce.ac.in", role: "ADMIN" },
+  });
+  await prisma.student.create({
+    data: {
+      usn: "1ATT22CS001",
+      name: "Test Attendance Student One",
+      section: "ATX",
+      admissionYear: 2023,
+      currentSemester: 4,
+      proctorId: attProctor.facultyId,
+      email: "test.att.student1@bmsce.ac.in",
+    },
+  });
+  await prisma.student.create({
+    data: {
+      usn: "1ATT22CS002",
+      name: "Test Attendance Student Two",
+      section: "ATX",
+      admissionYear: 2023,
+      currentSemester: 4,
+      email: "test.att.student2@bmsce.ac.in", // deliberately unassigned — the "not your proctee" skip case
+    },
   });
 });
 
@@ -787,5 +846,122 @@ describe("Student PTM visibility", () => {
     expect(res.status).toBe(200);
     expect(res.body.length).toBeGreaterThan(0);
     expect(res.body.every((p: any) => p.usn === "1TD22CS001")).toBe(true);
+  });
+});
+
+describe("Scan source-file retention", () => {
+  it("retains the uploaded sheet, links it to the committed batch, and gates download to the uploader or an Admin", async () => {
+    const proctor = await login("test.scansrc.proctor@bmsce.ac.in");
+
+    const pdf = await buildTextPdf(["Source-file retention test sheet", "1SRC22CS001 30 25 55 B"]);
+    const extractRes = await proctor.agent
+      .post("/api/admin/scan/extract")
+      .field("semester", "3")
+      .field("subjects", JSON.stringify([{ code: "CS33", name: "Test Subject", credits: 4 }]))
+      .attach("file", pdf, { filename: "sheet.pdf", contentType: "application/pdf" });
+    expect(extractRes.status).toBe(200);
+    expect(extractRes.body.sourceFile).toMatch(/^[a-f0-9]{32}\.pdf$/);
+
+    const commitRes = await proctor.agent.post("/api/admin/scan/commit").send({
+      semester: 3,
+      sourceType: "MAIN",
+      subjects: [{ code: "CS33", name: "Test Subject", credits: 4 }],
+      rows: [{ usn: "1SRC22CS001", cells: [{ internalMarks: 30, externalMarks: 25, totalMarks: 55, grade: "B", status: "PASS" }] }],
+      sourceFile: extractRes.body.sourceFile,
+    });
+    expect(commitRes.status).toBe(200);
+    const batchId = commitRes.body.batchId;
+
+    const ownerDownload = await proctor.agent.get(`/api/admin/import-batches/${batchId}/source-file`);
+    expect(ownerDownload.status).toBe(200);
+    expect(ownerDownload.headers["content-disposition"]).toBe("attachment");
+
+    const admin = await login("test.scansrc.admin@bmsce.ac.in");
+    expect((await admin.agent.get(`/api/admin/import-batches/${batchId}/source-file`)).status).toBe(200);
+
+    const other = await login("test.scansrc.blocked@bmsce.ac.in");
+    expect((await other.agent.get(`/api/admin/import-batches/${batchId}/source-file`)).status).toBe(403);
+  });
+
+  it("rejects a sourceFile value that doesn't match the opaque-filename shape it hands out", async () => {
+    const proctor = await login("test.scansrc.proctor@bmsce.ac.in");
+    const res = await proctor.agent.post("/api/admin/scan/commit").send({
+      semester: 3,
+      sourceType: "MAIN",
+      subjects: [{ code: "CS33", credits: 4 }],
+      rows: [{ usn: "1SRC22CS001", cells: [{ internalMarks: 30, externalMarks: 25, totalMarks: 55, grade: "B", status: "PASS" }] }],
+      sourceFile: "../../../etc/passwd",
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("Attendance", () => {
+  it("marks a day's attendance in bulk, skipping usns that aren't the caller's proctee", async () => {
+    const proctor = await login("test.att.proctor@bmsce.ac.in");
+    const res = await proctor.agent.post("/api/attendance/mark").send({
+      date: "2026-09-01",
+      records: [
+        { usn: "1ATT22CS001", status: "PRESENT" },
+        { usn: "1ATT22CS002", status: "ABSENT" }, // not this proctor's proctee
+      ],
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.marked).toBe(1);
+    expect(res.body.skipped).toEqual([{ usn: "1ATT22CS002", reason: "Not your proctee" }]);
+  });
+
+  it("amends an existing day's mark instead of duplicating it", async () => {
+    const proctor = await login("test.att.proctor@bmsce.ac.in");
+    const res = await proctor.agent.post("/api/attendance/mark").send({
+      date: "2026-09-01",
+      records: [{ usn: "1ATT22CS001", status: "LATE" }],
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.marked).toBe(1);
+
+    const summary = await proctor.agent.get("/api/students/1ATT22CS001/attendance/summary");
+    expect(summary.body.total).toBe(1); // still one row, not two
+    expect(summary.body.late).toBe(1);
+  });
+
+  it("blocks a Proctor from viewing a non-proctee's attendance summary", async () => {
+    const other = await login("test.att.blocked@bmsce.ac.in");
+    const blockedSummary = await other.agent.get("/api/students/1ATT22CS001/attendance/summary");
+    expect(blockedSummary.status).toBe(403);
+  });
+
+  it("lets a student read their own attendance summary, and computes present+late as the percentage", async () => {
+    const admin = await login("test.att.admin@bmsce.ac.in");
+    await admin.agent.post("/api/attendance/mark").send({ date: "2026-09-02", records: [{ usn: "1ATT22CS001", status: "PRESENT" }] });
+    await admin.agent.post("/api/attendance/mark").send({ date: "2026-09-03", records: [{ usn: "1ATT22CS001", status: "ABSENT" }] });
+
+    const student = await login("test.att.student1@bmsce.ac.in");
+    const res = await student.agent.get("/api/students/1ATT22CS001/attendance/summary");
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBe(3); // the LATE mark from above + these two
+    expect(res.body.present).toBe(1);
+    expect(res.body.absent).toBe(1);
+    expect(res.body.late).toBe(1);
+    expect(res.body.percentage).toBeCloseTo(66.7, 1); // (1 present + 1 late) / 3
+
+    const otherStudent = await login("test.att.student2@bmsce.ac.in" /* unused above */);
+    // A student querying their own (empty) summary is fine...
+    expect((await otherStudent.agent.get("/api/students/1ATT22CS002/attendance/summary")).status).toBe(200);
+    // ...but not someone else's.
+    expect((await otherStudent.agent.get("/api/students/1ATT22CS001/attendance/summary")).status).toBe(403);
+  });
+
+  it("rolls up section-wise attendance percentage for the Admin, admin-only", async () => {
+    const admin = await login("test.att.admin@bmsce.ac.in");
+    const res = await admin.agent.get("/api/admin/attendance/analytics?from=2026-09-01&to=2026-09-03");
+    expect(res.status).toBe(200);
+    const atx = res.body.bySection.find((s: any) => s.section === "ATX");
+    expect(atx).toBeTruthy();
+    expect(atx.recordCount).toBe(3);
+    expect(atx.percentage).toBeCloseTo(66.7, 1);
+
+    const proctor = await login("test.att.proctor@bmsce.ac.in");
+    expect((await proctor.agent.get("/api/admin/attendance/analytics")).status).toBe(403);
   });
 });

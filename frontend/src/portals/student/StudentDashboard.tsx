@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Award, Building2, CalendarClock, CheckCircle2, GraduationCap, Phone, TrendingUp, Users, XCircle } from "lucide-react";
+import { Award, Building2, CalendarCheck, CalendarClock, CheckCircle2, GraduationCap, Phone, TrendingUp, Users, XCircle } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { api } from "../../api/client";
 import { Avatar, Badge, Card, CardHeader, EmptyState, Skeleton, StatTile } from "../../components/ui";
@@ -27,6 +27,14 @@ interface Ptm {
   notes: string | null;
 }
 
+interface AttendanceSummary {
+  total: number;
+  present: number;
+  absent: number;
+  late: number;
+  percentage: number | null;
+}
+
 export default function StudentDashboard() {
   const { auth } = useAuth();
   const usn = auth && "usn" in auth.profile ? auth.profile.usn : "";
@@ -38,6 +46,7 @@ export default function StudentDashboard() {
   const [proctorLoaded, setProctorLoaded] = useState(false);
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [ptms, setPtms] = useState<Ptm[] | null>(null);
+  const [attendance, setAttendance] = useState<AttendanceSummary | null>(null);
 
   useEffect(() => {
     if (!usn) return;
@@ -48,6 +57,7 @@ export default function StudentDashboard() {
     });
     api.get(`/students/${usn}/activity-points`).then((r) => setPoints(r.runningTotal));
     api.get(`/students/${usn}/analytics/comparison`).then(setComparison);
+    api.get(`/students/${usn}/attendance/summary`).then(setAttendance);
     api.get("/ptm").then((r) => setPtms(r.sort((a: Ptm, b: Ptm) => (a.ptmDate < b.ptmDate ? 1 : -1)).slice(0, 5)));
     api
       .get("/proctors")
@@ -70,10 +80,17 @@ export default function StudentDashboard() {
         <p className="mt-1 text-sm text-slate-500">Your academic snapshot, at a glance.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatTile label="CGPA" value={cgpa ?? "N/A"} tone="blue" icon={GraduationCap} loading={cgpa === null} />
         <StatTile label="Backlog Subjects" value={backlogs ?? 0} tone={backlogs ? "red" : "green"} icon={backlogs ? XCircle : CheckCircle2} loading={backlogs === null} />
         <StatTile label="Activity Points" value={points ?? 0} tone="amber" icon={Award} loading={points === null} />
+        <StatTile
+          label="Attendance"
+          value={attendance?.percentage !== null && attendance?.percentage !== undefined ? `${attendance.percentage}%` : "N/A"}
+          tone={attendance?.percentage !== null && attendance !== null && attendance.percentage! < 75 ? "red" : "green"}
+          icon={CalendarCheck}
+          loading={attendance === null}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

@@ -41,6 +41,7 @@ model Faculty {
   notesAuthored   StudentNote[]
   auditLogs       AuditLog[]
   notifications   Notification[]
+  attendanceMarked AttendanceRecord[] @relation("AttendanceMarker")
 
   @@map("faculty")
 }
@@ -67,6 +68,7 @@ model Student {
   claims     ActivityPointClaim[]
   ptmRecords PtmRecord[]
   notes      StudentNote[]
+  attendance AttendanceRecord[]
 
   @@map("student")
 }
@@ -150,6 +152,29 @@ model StudentNote {
   @@map("student_note")
 }
 
+// Not in the original design doc — daily (not per-period) attendance, one
+// status per student per calendar date. A per-period/timetable model would
+// be far more true to how attendance is actually taken, but nothing in this
+// app models periods or a timetable at all; per-day is the smallest addition
+// that gives proctors/admins a real attendance percentage without inventing
+// a scheduling system this app has no other use for.
+model AttendanceRecord {
+  id        Int      @id @default(autoincrement())
+  usn       String
+  date      String // YYYY-MM-DD
+  status    String // PRESENT | ABSENT | LATE
+  markedBy  Int?     @map("marked_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  student Student  @relation(fields: [usn], references: [usn])
+  marker  Faculty? @relation("AttendanceMarker", fields: [markedBy], references: [facultyId])
+
+  @@unique([usn, date])
+  @@index([usn])
+  @@map("attendance_record")
+}
+
 model ImportBatch {
   batchId    Int      @id @default(autoincrement()) @map("batch_id")
   uploadedBy Int      @map("uploaded_by")
@@ -157,6 +182,12 @@ model ImportBatch {
   sourceType String   @map("source_type")
   rowCount   Int      @default(0) @map("row_count")
   errorCount Int      @default(0) @map("error_count")
+  // Path to the originally-uploaded PDF/image on disk, for scan-import
+  // batches only (null for CSV/sheet ingestion, which never had a source
+  // file worth keeping). Lets a reviewer go back to the actual scanned sheet
+  // if a committed value is ever disputed, instead of trusting the OCR/text
+  // extraction blind.
+  sourceFile String?  @map("source_file")
 
   uploader   Faculty           @relation(fields: [uploadedBy], references: [facultyId])
   exceptions ImportException[]

@@ -39,6 +39,7 @@ interface ExtractResponse {
   unparsedLines: { lineNumber: number; text: string }[];
   unparsedCount: number;
   rawTextPreview: string;
+  sourceFile: string;
 }
 
 const SOURCE_TYPES = ["MAIN", "TAL", "REVAL", "CHALLENGE_REVAL", "SUPPLEMENTARY"];
@@ -122,6 +123,7 @@ export default function ScanImport({ base: _base }: { base: string }) {
         sourceType,
         subjects: result.subjects,
         rows: result.rows.map((r) => ({ usn: r.usn, cells: r.cells })),
+        sourceFile: result.sourceFile,
       });
       setSummary(res);
       toast.success("Imported", `${res.created} result record(s) created${res.exceptions ? `, ${res.exceptions} routed to exceptions` : ""}.`);
@@ -312,6 +314,15 @@ export default function ScanImport({ base: _base }: { base: string }) {
                   Exceptions
                 </Link>{" "}
                 for details.
+              </p>
+            )}
+            {result?.sourceFile && (
+              <p className="text-xs text-slate-400">
+                The original sheet was kept —{" "}
+                <a href={`/api/admin/import-batches/${summary.batchId}/source-file`} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline">
+                  view it
+                </a>{" "}
+                any time from this upload's record on the Faculty page.
               </p>
             )}
             <Button variant="secondary" onClick={reset}>

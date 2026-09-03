@@ -15,6 +15,7 @@ import {
   Scale,
   BarChart3,
   History,
+  CalendarCheck,
 } from "lucide-react";
 import { useAuth } from "./auth/AuthContext";
 import Login from "./auth/Login";
@@ -33,6 +34,7 @@ import ProctorDashboard from "./portals/proctor/ProctorDashboard";
 import UploadResults from "./portals/proctor/UploadResults";
 import Calendar from "./portals/proctor/Calendar";
 import ActivityPointsReview from "./portals/proctor/ActivityPointsReview";
+import AttendanceMark from "./portals/proctor/AttendanceMark";
 
 import StudentDashboard from "./portals/student/StudentDashboard";
 import AcademicRecord from "./portals/student/AcademicRecord";
@@ -63,6 +65,7 @@ const proctorTabs = [
   { to: "/proctor/upload", label: "Upload Results", icon: FileSpreadsheet },
   { to: "/proctor/scan", label: "Scan Import", icon: ScanLine },
   { to: "/proctor/calendar", label: "Calendar / PTM", icon: CalendarDays },
+  { to: "/proctor/attendance", label: "Attendance", icon: CalendarCheck },
   { to: "/proctor/activity-points", label: "Activity Points", icon: Award },
 ];
 
@@ -133,6 +136,7 @@ export default function App() {
         <Route path="upload" element={<UploadResults />} />
         <Route path="scan" element={<ScanImport base="/proctor" />} />
         <Route path="calendar" element={<Calendar />} />
+        <Route path="attendance" element={<AttendanceMark />} />
         <Route path="activity-points" element={<ActivityPointsReview />} />
         <Route path="faculty/:id" element={<FacultyDetail base="/proctor" />} />
         <Route path="students/:usn" element={<StudentDetail base="/proctor" />} />

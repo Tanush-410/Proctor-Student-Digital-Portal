@@ -14,6 +14,7 @@ import { reportsRouter } from "./modules/reports/routes";
 import { scanRouter } from "./modules/scan/routes";
 import { notificationsRouter } from "./modules/notifications/routes";
 import { auditRouter } from "./modules/audit/routes";
+import { attendanceRouter } from "./modules/attendance/routes";
 
 export function createApp(options: { enforceHttps?: boolean } = {}) {
   const app = express();
@@ -112,6 +113,7 @@ export function createApp(options: { enforceHttps?: boolean } = {}) {
   api.use("/", scanRouter);
   api.use("/", notificationsRouter);
   api.use("/", auditRouter);
+  api.use("/", attendanceRouter);
 
   app.use("/api", api);
 
