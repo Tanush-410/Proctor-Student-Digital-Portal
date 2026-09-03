@@ -182,24 +182,51 @@ regression test:
 
 ## Deployment
 
+**Live:** https://proctor-diary.onrender.com (Render free tier, deployed from
+branch `tanimies` via the `render.yaml` Blueprint below).
+
 ### Render (managed, via `render.yaml`)
 
-The repo ships a Render Blueprint that runs the Dockerfile as one web service —
-no Caddy needed, Render terminates TLS itself.
+The repo ships a Render Blueprint that runs the Dockerfile as one **free** web
+service — no Caddy needed, Render terminates TLS itself.
 
-1. **render.com → New → Blueprint**, connect this repo, branch `tanimies`.
+1. Render dashboard → **Blueprints** → **New Blueprint Instance**, connect this
+   repo, branch `tanimies`.
 2. Render reads `render.yaml` and prompts for `DATABASE_URL` and `DIRECT_URL` —
    paste the Supabase strings (Project → Connect → ORMs → Prisma).
-3. Deploy. On start the container runs `prisma migrate deploy`; the data is
-   already in Supabase, so no seeding.
-4. **Logging in:** with no `SMTP_*` set, OTP codes appear only in the Render
-   **Logs** tab. For real users, uncomment the `SMTP_*` block in `render.yaml`
-   and fill it in.
+3. Apply. On start the container runs `prisma migrate deploy`; the data is
+   already in Supabase, so no seeding. First build takes ~5 min.
 
-The `disk:` block (persistent storage for uploaded proof files) needs a paid
-instance; on the free plan, delete that block — proof files then reset on each
-redeploy, nothing else changes. `npm run seed` needs dev dependencies
-(`tsx`), so run it from a laptop pointed at the database, not the Render shell.
+#### Logging in to the deployed app (getting the OTP)
+
+In production the 6-digit code is **not** shown on screen and **not** printed in
+the logs — deliberate (`src/modules/auth/routes.ts`): with no mail transport it
+"goes nowhere but the intended inbox, and login is correctly impossible rather
+than trivially bypassable". Two ways to get it:
+
+- **Read it from the database.** Supabase → **Table Editor** → `otp_request` →
+  newest row for your e-mail (`consumed = false`, `expires_at` in the future) →
+  copy `code`. Enter it within 5 minutes.
+- **Configure SMTP** so codes are e-mailed for real: add `SMTP_HOST`,
+  `SMTP_PORT` (587), `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` in Render →
+  **Environment** (with Gmail, `SMTP_PASS` is a 16-char App Password from
+  myaccount.google.com/apppasswords, not the account password). Render redeploys
+  and `POST /auth/otp/request` then delivers by e-mail.
+
+Do **not** change `NODE_ENV` away from `production` to make the code appear — it
+also disables HTTPS enforcement and the `Secure` cookie, and reopens the OTP
+leak the gate was added to close.
+
+#### Free-plan limits
+
+The service **sleeps after 15 min idle** (~50 s cold start on the next request;
+during that wake-up window some asset requests can 404, so the first load may
+look unstyled — hard-refresh once it's warm). There's **no persistent disk** —
+uploaded activity-point proof files are lost on each redeploy/restart (all real
+data is in Supabase, so it's unaffected). To remove both limits, switch `plan`
+to `starter` in `render.yaml` and add the `disk:` block shown there. `npm run
+seed` needs dev dependencies (`tsx`), so run it from a laptop pointed at the
+database, not the Render shell (which is also paid-only).
 
 Railway / Fly.io work the same way (they build the Dockerfile) — set the same
 env vars and mount a volume at `/data`.
@@ -241,9 +268,9 @@ docker compose exec \
 
 Idempotent — re-running it is a no-op if that e-mail is already an Admin. From there, log in as
 that Admin and use the **Faculty** tab to onboard everyone else. Without `SMTP_*` env vars set
-(below), the OTP code goes only to the container's own logs (`docker compose logs app`) — nowhere
-a caller can read it from, which is the point (see Security). Set `SMTP_*` for real deployments
-so people actually receive their code by e-mail instead of you reading it out of the logs for them.
+(below), a production OTP is written only to the `otp_request` table (never the response, never
+the logs — see Security) — read it from there (Supabase Table Editor), or set `SMTP_*` so codes
+are actually e-mailed. See "Logging in to the deployed app" above.
 
 This whole flow — fresh boot, migration, bootstrap, login over real HTTPS with a browser-grade
 Secure+httpOnly cookie, faculty/student onboarding, a spreadsheet upload, an activity-point claim
@@ -261,7 +288,7 @@ while building this, not just written and assumed to work.
 | `UPLOADS_DIR` | Where proof-file uploads are written — point this into the volume, e.g. `/data/uploads` | `backend/uploads` |
 | `CORS_ORIGIN` | Only relevant if the frontend is ever hosted separately from the API | `http://localhost:5173` |
 | `NODE_ENV` | `production` turns on serving the built frontend, HTTPS enforcement, and Secure cookies | — |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Real OTP e-mail delivery (`lib/mailer.ts`) — without these, OTPs only ever reach the server's own logs | unset |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Real OTP e-mail delivery (`lib/mailer.ts`) — without these, a production OTP is only in the `otp_request` DB table | unset |
 
 **What this doesn't include, deliberately:**
 - **Database backups.** Supabase takes daily backups automatically on its paid plans (the free
@@ -354,9 +381,10 @@ never from a client-supplied id in a URL or body — the design doc's own stated
 and the thing the original test suite was built around proving.
 
 **What's still on you:**
-- **A real SMTP provider.** Without `SMTP_*` configured, production logins only work for whoever
-  can read the container's logs — correct and safe, but not usable by real end users. Point it at
-  whatever your college/org already uses (Office 365, Google Workspace, SendGrid, etc.).
+- **A real SMTP provider.** Without `SMTP_*` configured, a production OTP is written only to the
+  `otp_request` DB table — fine for you to read out manually during a demo, not usable by real end
+  users. Point it at whatever your college/org already uses (Office 365, Google Workspace, SendGrid,
+  etc.), or Gmail with an App Password for a quick start.
 - **Keeping dependencies patched.** `npm audit` was run and cleared for both `backend/` and
   `frontend/` while building this (including upgrading `vitest`, `vite`, and `react-router-dom`
   past known CVEs) — that's a snapshot, not a standing guarantee. Re-run it periodically.
