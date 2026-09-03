@@ -1,8 +1,9 @@
 # Render Blueprint — deploys the whole app (API + built frontend) from the
-# existing Dockerfile as one persistent web service.
+# existing Dockerfile as one free web service.
 #
-# Setup: render.com -> New -> Blueprint -> connect this repo (branch tanimies).
-# Render reads this file, then asks you for the two values marked `sync: false`.
+# Setup: Render dashboard -> Blueprints -> New Blueprint Instance -> connect this
+# repo (branch tanimies). Render reads this file, then asks you for the two
+# values marked `sync: false` (the Supabase connection strings).
 #
 # The database is Supabase (already hosted) — this only runs the app.
 services:
