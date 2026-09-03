@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Award, CalendarPlus, CheckCircle2, Download, FileText, GraduationCap, MessageSquarePlus, StickyNote, Trash2, Users, XCircle } from "lucide-react";
+import { Award, CalendarCheck, CalendarPlus, CheckCircle2, Clock, Download, FileText, GraduationCap, MessageSquarePlus, StickyNote, Trash2, Users, XCircle } from "lucide-react";
 import { api, ApiError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useToast } from "../../components/Toast";
@@ -64,6 +64,15 @@ interface ProctorOption {
   role: string;
 }
 
+interface AttendanceSummary {
+  total: number;
+  present: number;
+  absent: number;
+  late: number;
+  percentage: number | null;
+  recent: { id: number; date: string; status: string }[];
+}
+
 function InfoField({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -88,6 +97,7 @@ export default function StudentDetail({ base }: { base: string }) {
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [proctorOptions, setProctorOptions] = useState<ProctorOption[]>([]);
   const [reassigning, setReassigning] = useState(false);
+  const [attendance, setAttendance] = useState<AttendanceSummary | null>(null);
 
   function loadNotes() {
     if (!usn) return;
@@ -107,6 +117,7 @@ export default function StudentDetail({ base }: { base: string }) {
       .catch((e) => setError(e.message ?? "Failed to load student"));
     loadNotes();
     api.get(`/students/${usn}/analytics/comparison`).then(setComparison);
+    api.get(`/students/${usn}/attendance/summary`).then(setAttendance);
   }, [usn]);
 
   useEffect(() => {
@@ -233,11 +244,17 @@ export default function StudentDetail({ base }: { base: string }) {
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
         <StatTile label="CGPA" value={results?.cgpa ?? "N/A"} tone="blue" icon={GraduationCap} />
         <StatTile label="Backlogs" value={results?.backlogSubjects.length ?? 0} tone={results && results.backlogSubjects.length > 0 ? "red" : "green"} icon={results && results.backlogSubjects.length > 0 ? XCircle : CheckCircle2} />
         <StatTile label="Activity Points" value={activity?.runningTotal ?? 0} tone="amber" icon={Award} />
         <StatTile label="Pending Claims" value={activity?.claims.filter((c) => c.status === "PENDING").length ?? 0} />
+        <StatTile
+          label="Attendance"
+          value={attendance?.percentage ?? "N/A"}
+          tone={attendance?.percentage !== null && attendance !== null && attendance.percentage! < 75 ? "red" : "green"}
+          icon={CalendarCheck}
+        />
       </div>
 
       {comparison && comparison.cgpa !== null && (
@@ -266,6 +283,25 @@ export default function StudentDetail({ base }: { base: string }) {
               )}
             </div>
           </div>
+        </Card>
+      )}
+
+      {attendance && attendance.total > 0 && (
+        <Card>
+          <CardHeader title="Attendance" subtitle={`${attendance.present} present, ${attendance.late} late, ${attendance.absent} absent — ${attendance.total} day(s) marked.`} icon={CalendarCheck} />
+          <ul className="flex flex-wrap gap-1.5 px-5 py-4">
+            {attendance.recent.map((r) => (
+              <li
+                key={r.id}
+                title={`${r.date}: ${r.status}`}
+                className={`flex h-8 w-8 items-center justify-center rounded-md text-[10px] font-semibold ${
+                  r.status === "PRESENT" ? "bg-emerald-100 text-emerald-700" : r.status === "LATE" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
+                }`}
+              >
+                {r.status === "PRESENT" ? <CheckCircle2 className="h-4 w-4" /> : r.status === "LATE" ? <Clock className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+              </li>
+            ))}
+          </ul>
         </Card>
       )}
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { AlertTriangle, Award, Building2, CalendarClock, GraduationCap, History, Mail, Phone, Users, XCircle } from "lucide-react";
+import { AlertTriangle, Award, Building2, CalendarClock, FileSearch, GraduationCap, History, Mail, Phone, Users, XCircle } from "lucide-react";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { Avatar, Badge, Card, CardHeader, EmptyState, PageSpinner, StatTile } from "../../components/ui";
@@ -44,6 +44,7 @@ interface ImportBatch {
   uploadedAt: string;
   rowCount: number;
   errorCount: number;
+  sourceFile: string | null;
 }
 
 interface Detail {
@@ -275,6 +276,7 @@ export default function FacultyDetail({ base }: { base: string }) {
                   <th className="px-5 py-2.5 font-medium">When</th>
                   <th className="px-5 py-2.5 font-medium">Rows</th>
                   <th className="px-5 py-2.5 font-medium">Errors</th>
+                  <th className="px-5 py-2.5 font-medium" />
                 </tr>
               </thead>
               <tbody>
@@ -285,6 +287,19 @@ export default function FacultyDetail({ base }: { base: string }) {
                     <td className="px-5 py-2.5 text-slate-600">{b.rowCount}</td>
                     <td className="px-5 py-2.5">
                       <Badge tone={b.errorCount > 0 ? "amber" : "green"}>{b.errorCount}</Badge>
+                    </td>
+                    <td className="px-5 py-2.5 text-right">
+                      {b.sourceFile && (
+                        <a
+                          href={`/api/admin/import-batches/${b.batchId}/source-file`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline"
+                        >
+                          <FileSearch className="h-3.5 w-3.5" />
+                          Source
+                        </a>
+                      )}
                     </td>
                   </tr>
                 ))}

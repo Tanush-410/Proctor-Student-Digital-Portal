@@ -1,9 +1,13 @@
 import multer from "multer";
+import path from "path";
+import fs from "fs";
+import crypto from "crypto";
 import { z } from "zod";
 import { prisma } from "../../db";
 import { AuthedRequest, requireAuth, requireRole } from "../../middleware/session";
 import { safeRouter } from "../../lib/asyncSafeRouter";
 import { InvalidFileTypeError } from "../../lib/errors";
+import { UPLOADS_DIR } from "../../lib/config";
 import { extractFromPdf, NoTextLayerError, ocrImage, parseResultRows } from "./engine";
 import { logAudit } from "../../lib/audit";
 import { notify } from "../../lib/notify";
@@ -11,6 +15,12 @@ import { notify } from "../../lib/notify";
 export const scanRouter = safeRouter();
 
 const ALLOWED_SCAN_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
+const SCAN_EXTENSIONS: Record<string, string> = {
+  "application/pdf": ".pdf",
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+  "image/webp": ".webp",
+};
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
@@ -21,6 +31,12 @@ const upload = multer({
     cb(null, true);
   },
 });
+
+// Retained scanned sheets live alongside activity-point proof files — same
+// "opaque random filename is the access token" pattern (see
+// activityPoints/routes.ts), not served by a bare express.static mount.
+const scanDir = path.join(UPLOADS_DIR, "scans");
+fs.mkdirSync(scanDir, { recursive: true });
 
 const subjectSchema = z.object({ code: z.string().min(1), name: z.string().optional(), credits: z.coerce.number().int().min(0).max(10) });
 const extractFieldsSchema = z.object({
@@ -73,6 +89,12 @@ scanRouter.post("/admin/scan/extract", requireAuth, requireRole("ADMIN", "PROCTO
     matched: studentByUsn.has(r.usn),
   }));
 
+  // Kept on disk only once the file has proven readable (text/OCR actually
+  // came back) — a garbage upload that hit NoTextLayerError above never gets
+  // this far, so nothing worth tracing back to gets written for it.
+  const sourceFile = `${crypto.randomBytes(16).toString("hex")}${SCAN_EXTENSIONS[req.file.mimetype] ?? ""}`;
+  fs.writeFileSync(path.join(scanDir, sourceFile), req.file.buffer);
+
   res.json({
     semester,
     subjects,
@@ -81,6 +103,7 @@ scanRouter.post("/admin/scan/extract", requireAuth, requireRole("ADMIN", "PROCTO
     unparsedLines: unparsedLines.slice(0, 20),
     unparsedCount: unparsedLines.length,
     rawTextPreview: text.slice(0, 4000),
+    sourceFile,
   });
 });
 
@@ -97,6 +120,13 @@ const commitSchema = z.object({
   sourceType: z.enum(["MAIN", "TAL", "REVAL", "CHALLENGE_REVAL", "SUPPLEMENTARY"]),
   subjects: z.array(subjectSchema).min(1).max(12),
   rows: z.array(commitRowSchema).min(1),
+  // The opaque filename /extract handed back — validated against the exact
+  // shape we generate it in (32 hex chars + a known extension), never
+  // trusted as a free-form path component from the client.
+  sourceFile: z
+    .string()
+    .regex(/^[a-f0-9]{32}\.(pdf|jpg|png|webp)$/)
+    .optional(),
 });
 
 // POST /admin/scan/commit — the reviewed (possibly hand-corrected) rows from
@@ -107,10 +137,10 @@ const commitSchema = z.object({
 scanRouter.post("/admin/scan/commit", requireAuth, requireRole("ADMIN", "PROCTOR"), async (req: AuthedRequest, res) => {
   const parsed = commitSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const { semester, sourceType, subjects, rows } = parsed.data;
+  const { semester, sourceType, subjects, rows, sourceFile } = parsed.data;
 
   const batch = await prisma.importBatch.create({
-    data: { uploadedBy: req.auth!.facultyId!, sourceType: `SCAN_${sourceType}`, rowCount: rows.length, errorCount: 0 },
+    data: { uploadedBy: req.auth!.facultyId!, sourceType: `SCAN_${sourceType}`, rowCount: rows.length, errorCount: 0, sourceFile },
   });
 
   let created = 0;
@@ -176,4 +206,25 @@ scanRouter.post("/admin/scan/commit", requireAuth, requireRole("ADMIN", "PROCTOR
   logAudit(req, "COMMIT", "ScanImportBatch", String(batch.batchId), { created, exceptions: exceptions.length, semester, sourceType });
 
   res.json({ batchId: batch.batchId, created, exceptions: exceptions.length });
+});
+
+// GET /admin/import-batches/:id/source-file — the originally-uploaded PDF/
+// image for a scan-import batch, if one was retained. Same access rule as
+// proof files (activityPoints/routes.ts): the batch's own uploader, or any
+// Admin — not a bare express.static mount, and forced to download rather
+// than render inline so nothing served here can execute as a page in this
+// app's origin regardless of what content sneaks past the upload whitelist.
+scanRouter.get("/admin/import-batches/:id/source-file", requireAuth, requireRole("ADMIN", "PROCTOR"), async (req: AuthedRequest, res) => {
+  const id = parseInt(req.params.id, 10);
+  const batch = await prisma.importBatch.findUnique({ where: { batchId: id } });
+  if (!batch || !batch.sourceFile) return res.status(404).json({ error: "No source file retained for this batch" });
+  if (req.auth!.role !== "ADMIN" && batch.uploadedBy !== req.auth!.facultyId) {
+    return res.status(403).json({ error: "Not authorized to view this file" });
+  }
+
+  res.setHeader("Content-Disposition", "attachment");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.sendFile(path.join(scanDir, batch.sourceFile), (err) => {
+    if (err && !res.headersSent) res.status(404).json({ error: "File missing on disk" });
+  });
 });

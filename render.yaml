@@ -41,6 +41,10 @@ services:
       #   sync: false
       # - key: SMTP_FROM
       #   sync: false
+      # Used only to build the link in a notification e-mail (claim
+      # submitted, proctee at-risk) — set to this service's own URL.
+      # - key: APP_URL
+      #   value: https://proctor-diary.onrender.com
     #
     # No persistent disk on the free plan — uploaded activity-point proof files
     # live under UPLOADS_DIR on the instance's ephemeral filesystem and are lost

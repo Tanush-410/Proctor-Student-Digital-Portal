@@ -8,5 +8,7 @@ uploads/proofs/*
 !uploads/proofs/.gitkeep
 uploads/imports/*
 !uploads/imports/.gitkeep
+uploads/scans/*
+!uploads/scans/.gitkeep
 .env
 *.traineddata
