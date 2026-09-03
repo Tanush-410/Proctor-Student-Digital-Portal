@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
+import PDFDocument from "pdfkit";
 import { createApp, attachErrorHandler } from "../app";
 import { prisma } from "../db";
 
@@ -22,11 +23,27 @@ async function login(email: string) {
   return { agent, role: verifyRes.body.role as string, profile: verifyRes.body.profile };
 }
 
+/** Builds a real, valid single-page text PDF for the scan-import tests — a hand-built byte stream turned out too fragile for pdf-parse to trust. */
+function buildTextPdf(lines: string[]): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument();
+    const chunks: Buffer[] = [];
+    doc.on("data", (c: Buffer) => chunks.push(c));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+    lines.forEach((line) => doc.fontSize(10).text(line));
+    doc.end();
+  });
+}
+
 beforeAll(async () => {
   // Tables in FK-safe delete order.
+  await prisma.auditLog.deleteMany();
+  await prisma.notification.deleteMany();
   await prisma.importException.deleteMany();
   await prisma.importBatch.deleteMany();
   await prisma.activityPointClaim.deleteMany();
+  await prisma.studentNote.deleteMany();
   await prisma.ptmRecord.deleteMany();
   await prisma.resultRecord.deleteMany();
   await prisma.student.deleteMany();
@@ -110,6 +127,112 @@ beforeAll(async () => {
       currentSemester: 5,
       proctorId: idorProctorOwner.facultyId,
       email: "test.filetype.student@bmsce.ac.in",
+    },
+  });
+
+  // Dedicated fixtures for faculty-detail/analytics/notes/PTM/scan coverage —
+  // fresh accounts again, same OTP-budget reasoning as above.
+  const detailProctor = await prisma.faculty.create({
+    data: { staffId: "T092", name: "Test Detail Proctor", shortCode: "TDP", email: "test.detail.proctor@bmsce.ac.in", role: "PROCTOR" },
+  });
+  await prisma.faculty.create({
+    data: { staffId: "T091", name: "Test Detail Admin", shortCode: "TDA", email: "test.detail.admin@bmsce.ac.in", role: "ADMIN" },
+  });
+  await prisma.faculty.create({
+    data: { staffId: "T090", name: "Test Detail Other Proctor", shortCode: "TDO", email: "test.detail.other@bmsce.ac.in", role: "PROCTOR" },
+  });
+  const detailProctor2 = await prisma.faculty.create({
+    data: { staffId: "T089", name: "Test Detail Proctor Two", shortCode: "TDP2", email: "test.detail.proctor2@bmsce.ac.in", role: "PROCTOR" },
+  });
+  await prisma.student.create({
+    data: {
+      usn: "1TD22CS001",
+      name: "Test Detail Student One",
+      section: "TDX",
+      admissionYear: 2023,
+      currentSemester: 3,
+      proctorId: detailProctor.facultyId,
+      email: "test.detail.student1@bmsce.ac.in",
+    },
+  });
+  await prisma.student.create({
+    data: {
+      usn: "1TD22CS002",
+      name: "Test Detail Student Two",
+      section: "TDX",
+      admissionYear: 2023,
+      currentSemester: 3,
+      proctorId: detailProctor.facultyId,
+      email: "test.detail.student2@bmsce.ac.in",
+    },
+  });
+  await prisma.student.create({
+    data: {
+      usn: "1TD22CS003",
+      name: "Test Detail Student Three",
+      section: "TDY",
+      admissionYear: 2023,
+      currentSemester: 3,
+      proctorId: detailProctor2.facultyId,
+      email: "test.detail.student3@bmsce.ac.in",
+    },
+  });
+  // Backlog fixture so the analytics "at-risk" list has something to find.
+  await prisma.resultRecord.create({
+    data: { usn: "1TD22CS001", subjectCode: "CS31", semester: 3, sourceType: "MAIN", grade: "F", status: "FAIL", totalMarks: 30, credits: 4 },
+  });
+  await prisma.resultRecord.create({
+    data: { usn: "1TD22CS002", subjectCode: "CS31", semester: 3, sourceType: "MAIN", grade: "A", status: "PASS", totalMarks: 80, credits: 4 },
+  });
+  await prisma.resultRecord.create({
+    data: { usn: "1TD22CS003", subjectCode: "CS31", semester: 3, sourceType: "MAIN", grade: "O", status: "PASS", totalMarks: 95, credits: 4 },
+  });
+
+  // Fresh, single-use accounts for the workload/analytics/bulk-action tests
+  // below — same reasoning as every other "dedicated account" comment in this
+  // file: test.detail.proctor/other are already at (or near) the 5-per-10-min
+  // OTP request budget from the describe blocks above, so anything new logs
+  // in as one of these instead rather than pushing those over the limit.
+  const bulkProctor = await prisma.faculty.create({
+    data: { staffId: "T088", name: "Test Bulk Proctor", shortCode: "TBP", email: "test.bulk.proctor@bmsce.ac.in", role: "PROCTOR" },
+  });
+  await prisma.faculty.create({
+    data: { staffId: "T087", name: "Test Compare Viewer", shortCode: "TCV", email: "test.compare.viewer@bmsce.ac.in", role: "PROCTOR" },
+  });
+  await prisma.faculty.create({
+    data: { staffId: "T086", name: "Test Dept Analytics Blocked", shortCode: "TDB", email: "test.deptanalytics.blocked@bmsce.ac.in", role: "PROCTOR" },
+  });
+  await prisma.faculty.create({
+    data: { staffId: "T085", name: "Test Reassign Blocked", shortCode: "TRB", email: "test.reassign.blocked@bmsce.ac.in", role: "PROCTOR" },
+  });
+  await prisma.faculty.create({
+    data: { staffId: "T084", name: "Test Auditlog Blocked", shortCode: "TAB", email: "test.auditlog.blocked@bmsce.ac.in", role: "PROCTOR" },
+  });
+  const bulkOtherProctor = await prisma.faculty.create({
+    data: { staffId: "T083", name: "Test Bulk Other Proctor", shortCode: "TBO", email: "test.bulk.other@bmsce.ac.in", role: "PROCTOR" },
+  });
+  // Semester 6 (not 3) and its own faculty — deliberately outside every other
+  // fixture cluster in this file, so these rows can't skew the Department-wide
+  // analytics or Faculty workload assertions computed over semester 3 / the
+  // "detail" proctors above.
+  await prisma.student.create({
+    data: {
+      usn: "1BLK22CS001",
+      name: "Test Bulk Student One",
+      admissionYear: 2023,
+      currentSemester: 6,
+      proctorId: bulkProctor.facultyId,
+      email: "test.bulk.student1@bmsce.ac.in",
+    },
+  });
+  await prisma.student.create({
+    data: {
+      usn: "1BLK22CS002",
+      name: "Test Bulk Student Two",
+      admissionYear: 2023,
+      currentSemester: 6,
+      proctorId: bulkOtherProctor.facultyId, // deliberately NOT bulkProctor's — the "not your proctee" skip case
+      email: "test.bulk.student2@bmsce.ac.in",
     },
   });
 
@@ -407,5 +530,262 @@ describe("Proof file access control (IDOR regression coverage)", () => {
       .field("requestedPoints", "5")
       .attach("proof", Buffer.from("<script>alert(document.cookie)</script>"), { filename: "evil.html", contentType: "text/html" });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("Faculty detail + analytics", () => {
+  it("GET /proctors/:id returns full detail including proctees, viewable by any Admin/Proctor", async () => {
+    const admin = await login("test.detail.admin@bmsce.ac.in");
+    const proctorId = (await prisma.faculty.findUniqueOrThrow({ where: { email: "test.detail.proctor@bmsce.ac.in" } })).facultyId;
+
+    const res = await admin.agent.get(`/api/proctors/${proctorId}`);
+    expect(res.status).toBe(200);
+    expect(res.body.faculty.email).toBe("test.detail.proctor@bmsce.ac.in");
+    expect(res.body.proctees).toHaveLength(2);
+  });
+
+  it("GET /proctors/:id/analytics computes avgCgpa and an at-risk list from real effective results", async () => {
+    const proctor = await login("test.detail.proctor@bmsce.ac.in");
+    const proctorId = (await prisma.faculty.findUniqueOrThrow({ where: { email: "test.detail.proctor@bmsce.ac.in" } })).facultyId;
+
+    const res = await proctor.agent.get(`/api/proctors/${proctorId}/analytics`);
+    expect(res.status).toBe(200);
+    expect(res.body.proctee_count).toBe(2);
+    expect(res.body.backlogCount).toBe(1);
+    expect(res.body.atRisk.some((s: any) => s.usn === "1TD22CS001")).toBe(true);
+    expect(res.body.atRisk.some((s: any) => s.usn === "1TD22CS002")).toBe(false);
+  });
+
+  it("blocks a Proctor from viewing another proctor's analytics", async () => {
+    const other = await login("test.detail.other@bmsce.ac.in");
+    const proctorId = (await prisma.faculty.findUniqueOrThrow({ where: { email: "test.detail.proctor@bmsce.ac.in" } })).facultyId;
+    const res = await other.agent.get(`/api/proctors/${proctorId}/analytics`);
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("Student notes", () => {
+  it("lets a proctor add and read a note for their own proctee, but not for someone else's", async () => {
+    const proctor = await login("test.detail.proctor@bmsce.ac.in");
+    const other = await login("test.detail.other@bmsce.ac.in");
+
+    const blocked = await other.agent.post("/api/students/1TD22CS001/notes").send({ note: "should not be allowed" });
+    expect(blocked.status).toBe(403);
+
+    const created = await proctor.agent.post("/api/students/1TD22CS001/notes").send({ note: "Spoke with parents about attendance." });
+    expect(created.status).toBe(201);
+
+    const list = await proctor.agent.get("/api/students/1TD22CS001/notes");
+    expect(list.status).toBe(200);
+    expect(list.body).toHaveLength(1);
+    expect(list.body[0].note).toBe("Spoke with parents about attendance.");
+  });
+
+  it("a Student session cannot read notes about themselves — staff-only", async () => {
+    const res = await request(testApp).get("/api/students/1TD22CS001/notes");
+    expect(res.status).toBe(401); // no session at all; role check alone is covered by requireRole not listing STUDENT
+  });
+});
+
+describe("PTM per-student tagging", () => {
+  it("lets a proctor tag a PTM to their own proctee and filter by usn, but not tag another proctor's student", async () => {
+    const proctor = await login("test.detail.proctor@bmsce.ac.in");
+    const other = await login("test.detail.other@bmsce.ac.in");
+
+    const blocked = await other.agent.post("/api/ptm").send({ ptmDate: "2026-10-01", ptmTime: "10:00", usn: "1TD22CS001" });
+    expect(blocked.status).toBe(403);
+
+    const ok = await proctor.agent.post("/api/ptm").send({ ptmDate: "2026-10-01", ptmTime: "10:00", usn: "1TD22CS001", notes: "Discussed backlog" });
+    expect(ok.status).toBe(201);
+
+    const filtered = await proctor.agent.get("/api/ptm?usn=1TD22CS001");
+    expect(filtered.status).toBe(200);
+    expect(filtered.body).toHaveLength(1);
+    expect(filtered.body[0].notes).toBe("Discussed backlog");
+  });
+});
+
+describe("PDF/image scan import", () => {
+  it("extracts rows from a text PDF, matches known USNs, and commits them as real ResultRecords", async () => {
+    const proctor = await login("test.detail.proctor@bmsce.ac.in");
+
+    const pdf = await buildTextPdf(["4th Semester Result Sheet — Section Test", "1TD22CS001 30 25 55 B"]);
+
+    const extractRes = await proctor.agent
+      .post("/api/admin/scan/extract")
+      .field("semester", "3")
+      .field("subjects", JSON.stringify([{ code: "CS32", name: "Test Subject", credits: 4 }]))
+      .attach("file", pdf, { filename: "sheet.pdf", contentType: "application/pdf" });
+
+    expect(extractRes.status).toBe(200);
+    expect(extractRes.body.rows).toHaveLength(1);
+    expect(extractRes.body.rows[0].usn).toBe("1TD22CS001");
+    expect(extractRes.body.rows[0].matched).toBe(true);
+    expect(extractRes.body.rows[0].cells[0].totalMarks).toBe(55);
+
+    const commitRes = await proctor.agent.post("/api/admin/scan/commit").send({
+      semester: 3,
+      sourceType: "MAIN",
+      subjects: [{ code: "CS32", name: "Test Subject", credits: 4 }],
+      rows: [{ usn: "1TD22CS001", cells: [{ internalMarks: 30, externalMarks: 25, totalMarks: 55, grade: "B", status: "PASS" }] }],
+    });
+    expect(commitRes.status).toBe(200);
+    expect(commitRes.body.created).toBe(1);
+    expect(commitRes.body.exceptions).toBe(0);
+
+    const check = await proctor.agent.get("/api/students/1TD22CS001/results");
+    expect(check.body.some((r: any) => r.subjectCode === "CS32" && r.totalMarks === 55)).toBe(true);
+  });
+
+  it("rejects a non-PDF/image file type at the multer layer", async () => {
+    const proctor = await login("test.detail.proctor@bmsce.ac.in");
+    const res = await proctor.agent
+      .post("/api/admin/scan/extract")
+      .field("semester", "3")
+      .field("subjects", JSON.stringify([{ code: "CS32", credits: 4 }]))
+      .attach("file", Buffer.from("not a pdf"), { filename: "sheet.txt", contentType: "text/plain" });
+    expect(res.status).toBe(400);
+  });
+
+  it("routes a commit row for a non-proctee to the exception queue instead of writing it", async () => {
+    const other = await login("test.detail.other@bmsce.ac.in");
+    const res = await other.agent.post("/api/admin/scan/commit").send({
+      semester: 3,
+      sourceType: "MAIN",
+      subjects: [{ code: "CS32", name: "Test Subject", credits: 4 }],
+      rows: [{ usn: "1TD22CS002", cells: [{ internalMarks: 30, externalMarks: 25, totalMarks: 55, grade: "B", status: "PASS" }] }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.created).toBe(0);
+    expect(res.body.exceptions).toBe(1);
+  });
+});
+
+describe("Department-wide analytics", () => {
+  it("aggregates CGPA/backlog/at-risk by section and by semester, admin-only", async () => {
+    const other = await login("test.deptanalytics.blocked@bmsce.ac.in");
+    expect((await other.agent.get("/api/admin/analytics")).status).toBe(403);
+
+    const admin = await login("test.detail.admin@bmsce.ac.in");
+    const res = await admin.agent.get("/api/admin/analytics");
+    expect(res.status).toBe(200);
+
+    // 1TD22CS001 now carries two records (the CS31 backlog fixture plus the
+    // CS32 scan-import row from the previous describe block): CGPA 3.0, one
+    // backlog. 1TD22CS002 is a clean CGPA 8; 1TD22CS003 a clean CGPA 10.
+    const sectionTDX = res.body.bySection.find((s: any) => s.section === "TDX");
+    expect(sectionTDX).toMatchObject({ studentCount: 2, avgCgpa: 5.5, backlogCount: 1, atRiskCount: 1 });
+
+    const sectionTDY = res.body.bySection.find((s: any) => s.section === "TDY");
+    expect(sectionTDY).toMatchObject({ studentCount: 1, avgCgpa: 10, backlogCount: 0, atRiskCount: 0 });
+
+    const sem3 = res.body.bySemester.find((s: any) => s.semester === 3);
+    expect(sem3).toMatchObject({ studentCount: 3, avgCgpa: 7, backlogCount: 1, atRiskCount: 1 });
+  });
+});
+
+describe("Student CGPA comparison analytics", () => {
+  it("computes section and semester percentile/rank against peers", async () => {
+    const proctor = await login("test.compare.viewer@bmsce.ac.in");
+    const res = await proctor.agent.get("/api/students/1TD22CS002/analytics/comparison");
+    expect(res.status).toBe(200);
+    expect(res.body.cgpa).toBe(8);
+    expect(res.body.section).toMatchObject({ label: "TDX", avgCgpa: 5.5, percentile: 50, rank: 1, of: 2 });
+    expect(res.body.semester).toMatchObject({ label: "Semester 3", avgCgpa: 7, percentile: 33, rank: 2, of: 3 });
+    expect(res.body.section.distribution.reduce((s: number, b: any) => s + b.count, 0)).toBe(2);
+  });
+
+  it("lets the student view their own comparison but not another student's", async () => {
+    const self = await login("test.detail.student2@bmsce.ac.in");
+    expect((await self.agent.get("/api/students/1TD22CS002/analytics/comparison")).status).toBe(200);
+    expect((await self.agent.get("/api/students/1TD22CS001/analytics/comparison")).status).toBe(403);
+  });
+});
+
+describe("Faculty workload + reassignment", () => {
+  it("reports proctee-count balance and lets an Admin move a student to a different proctor", async () => {
+    const admin = await login("test.detail.admin@bmsce.ac.in");
+    const proctor1 = await prisma.faculty.findUniqueOrThrow({ where: { email: "test.detail.proctor@bmsce.ac.in" } });
+    const proctor2 = await prisma.faculty.findUniqueOrThrow({ where: { email: "test.detail.proctor2@bmsce.ac.in" } });
+
+    const before = await admin.agent.get("/api/admin/workload");
+    expect(before.status).toBe(200);
+    expect(before.body.proctors.find((p: any) => p.facultyId === proctor1.facultyId).procteeCount).toBe(2);
+    expect(before.body.proctors.find((p: any) => p.facultyId === proctor2.facultyId).procteeCount).toBe(1);
+
+    const other = await login("test.reassign.blocked@bmsce.ac.in");
+    expect((await other.agent.patch("/api/students/1TD22CS002/proctor").send({ proctorId: proctor2.facultyId })).status).toBe(403);
+
+    const reassign = await admin.agent.patch("/api/students/1TD22CS002/proctor").send({ proctorId: proctor2.facultyId });
+    expect(reassign.status).toBe(200);
+    expect(reassign.body.proctorId).toBe(proctor2.facultyId);
+
+    const after = await admin.agent.get("/api/admin/workload");
+    expect(after.body.proctors.find((p: any) => p.facultyId === proctor1.facultyId).procteeCount).toBe(1);
+    expect(after.body.proctors.find((p: any) => p.facultyId === proctor2.facultyId).procteeCount).toBe(2);
+  });
+
+  it("notified the new proctor, and logged the reassignment to the audit trail", async () => {
+    const proctor2 = await login("test.detail.proctor2@bmsce.ac.in");
+    const notifs = await proctor2.agent.get("/api/notifications");
+    expect(notifs.status).toBe(200);
+    const assigned = notifs.body.items.find((n: any) => n.type === "PROCTEE_ASSIGNED");
+    expect(assigned).toBeTruthy();
+    expect(notifs.body.unreadCount).toBeGreaterThan(0);
+
+    const markRead = await proctor2.agent.post(`/api/notifications/${assigned.id}/read`);
+    expect(markRead.status).toBe(200);
+
+    const admin = await login("test.detail.admin@bmsce.ac.in");
+    const audit = await admin.agent.get("/api/admin/audit-log?targetType=Student&targetId=1TD22CS002");
+    expect(audit.status).toBe(200);
+    expect(audit.body.entries.some((e: any) => e.action === "REASSIGN")).toBe(true);
+
+    const other = await login("test.auditlog.blocked@bmsce.ac.in");
+    expect((await other.agent.get("/api/admin/audit-log")).status).toBe(403);
+  });
+});
+
+describe("Bulk PTM and bulk notes", () => {
+  it("logs the same PTM against several proctees, skipping usns that aren't the caller's", async () => {
+    const proctor = await login("test.bulk.proctor@bmsce.ac.in");
+    const res = await proctor.agent.post("/api/ptm/bulk").send({
+      ptmDate: "2026-10-05",
+      ptmTime: "11:00",
+      notes: "Section-wide check-in",
+      usns: ["1BLK22CS001", "1BLK22CS002"], // 1BLK22CS002 belongs to a different proctor
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.created).toBe(1);
+    expect(res.body.skipped).toEqual([{ usn: "1BLK22CS002", reason: "Not your proctee" }]);
+  });
+
+  it("logs the same note against several proctees, skipping unknown/unauthorized usns", async () => {
+    const proctor = await login("test.bulk.proctor@bmsce.ac.in");
+    const res = await proctor.agent.post("/api/students/notes/bulk").send({
+      note: "Attended the semester kickoff meeting.",
+      usns: ["1BLK22CS001", "1BLK22CS002", "1BLKNONEXISTENT"],
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.created).toBe(1);
+    expect(res.body.skipped).toEqual(
+      expect.arrayContaining([
+        { usn: "1BLK22CS002", reason: "Not your proctee" },
+        { usn: "1BLKNONEXISTENT", reason: "Unknown USN" },
+      ])
+    );
+
+    const notes = await proctor.agent.get("/api/students/1BLK22CS001/notes");
+    expect(notes.body.some((n: any) => n.note === "Attended the semester kickoff meeting.")).toBe(true);
+  });
+});
+
+describe("Student PTM visibility", () => {
+  it("lets a student read their own PTM history and nothing else", async () => {
+    const student = await login("test.detail.student1@bmsce.ac.in");
+    const res = await student.agent.get("/api/ptm");
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBeGreaterThan(0);
+    expect(res.body.every((p: any) => p.usn === "1TD22CS001")).toBe(true);
   });
 });

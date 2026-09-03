@@ -74,15 +74,17 @@ export default function Directory({ role }: { role: "ADMIN" | "PROCTOR" }) {
             ) : (
               <ul className="divide-y divide-slate-100">
                 {faculty.map((f) => (
-                  <li key={f.facultyId} className="flex items-center gap-3 px-5 py-3">
-                    <Avatar name={f.name} />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-slate-800">{f.name}</div>
-                      <div className="truncate text-xs text-slate-400">
-                        {f.shortCode} · {f.cabinNo ?? "no cabin"} · {f.phone ?? f.email}
+                  <li key={f.facultyId}>
+                    <Link to={`${base}/faculty/${f.facultyId}`} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-slate-50">
+                      <Avatar name={f.name} />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-slate-800">{f.name}</div>
+                        <div className="truncate text-xs text-slate-400">
+                          {f.shortCode} · {f.cabinNo ?? "no cabin"} · {f.phone ?? f.email}
+                        </div>
                       </div>
-                    </div>
-                    <Badge tone={f.role === "ADMIN" ? "blue" : "slate"}>{f.role}</Badge>
+                      <Badge tone={f.role === "ADMIN" ? "blue" : "slate"}>{f.role}</Badge>
+                    </Link>
                   </li>
                 ))}
               </ul>

@@ -38,6 +38,9 @@ model Faculty {
   claimsReviewed  ActivityPointClaim[]  @relation("ClaimReviewer")
   importBatches   ImportBatch[]
   resultsUploaded ResultRecord[]        @relation("ResultUploader")
+  notesAuthored   StudentNote[]
+  auditLogs       AuditLog[]
+  notifications   Notification[]
 
   @@map("faculty")
 }
@@ -59,9 +62,11 @@ model Student {
   localGuardianPhone String?  @map("local_guardian_phone")
   email                String   @unique
 
-  proctor  Faculty?             @relation("ProctorStudents", fields: [proctorId], references: [facultyId])
-  results  ResultRecord[]
-  claims   ActivityPointClaim[]
+  proctor    Faculty?             @relation("ProctorStudents", fields: [proctorId], references: [facultyId])
+  results    ResultRecord[]
+  claims     ActivityPointClaim[]
+  ptmRecords PtmRecord[]
+  notes      StudentNote[]
 
   @@map("student")
 }
@@ -111,13 +116,38 @@ model ActivityPointClaim {
 model PtmRecord {
   ptmId     Int      @id @default(autoincrement()) @map("ptm_id")
   proctorId Int      @map("proctor_id")
+  // Optional — a PTM can be a general slot (null) or tagged to one student,
+  // shown on that student's detail page. Nullable rather than required since
+  // Section 8.3/Figure 9's original design treats PTM as proctor-level
+  // record-keeping, not inherently per-student.
+  usn       String?
   ptmDate   String   @map("ptm_date")
   ptmTime   String   @map("ptm_time")
   notes     String?
 
-  proctor Faculty @relation(fields: [proctorId], references: [facultyId])
+  proctor Faculty  @relation(fields: [proctorId], references: [facultyId])
+  student Student? @relation(fields: [usn], references: [usn])
 
   @@map("ptm_record")
+}
+
+// Not in the original design doc — added so a proctor's per-student
+// observations ("spoke to parents about attendance", "recommended for
+// scholarship") have somewhere to live beyond a PTM note, and so the report
+// card (Section 8, reports/pdf.ts) has real remarks to print instead of
+// nothing. Any Admin/Proctor with read access to the student can add one;
+// only the author or an Admin can delete it.
+model StudentNote {
+  id        Int      @id @default(autoincrement())
+  usn       String
+  authorId  Int      @map("author_id")
+  note      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  student Student @relation(fields: [usn], references: [usn])
+  author  Faculty @relation(fields: [authorId], references: [facultyId])
+
+  @@map("student_note")
 }
 
 model ImportBatch {
@@ -149,6 +179,47 @@ model ImportException {
   batch ImportBatch @relation(fields: [batchId], references: [batchId])
 
   @@map("import_exception")
+}
+
+// Compliance trail for the real student PII this app holds: who touched
+// (viewed/edited/exported) which record, and when. Written by lib/audit.ts,
+// called from the routes that read or mutate a specific student/faculty
+// record — not every list/search call, which would just be write-volume
+// noise without adding accountability value.
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  actorId    Int?     @map("actor_id")
+  actorRole  String   @map("actor_role")
+  action     String
+  targetType String   @map("target_type")
+  targetId   String   @map("target_id")
+  metadata   String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  actor Faculty? @relation(fields: [actorId], references: [facultyId])
+
+  @@index([targetType, targetId])
+  @@index([actorId])
+  @@map("audit_log")
+}
+
+// In-app notifications for a faculty member (claim needs review, scan
+// exceptions landed, a proctee crossed into at-risk) — a lightweight
+// alternative to polling the dashboard. Not part of the original design doc.
+model Notification {
+  id          Int      @id @default(autoincrement())
+  recipientId Int      @map("recipient_id")
+  type        String
+  title       String
+  body        String?
+  link        String?
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  recipient Faculty @relation(fields: [recipientId], references: [facultyId])
+
+  @@index([recipientId, read])
+  @@map("notification")
 }
 
 model OtpRequest {

@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { Award, CheckCircle2, Download, FileText, GraduationCap, XCircle } from "lucide-react";
-import { api } from "../../api/client";
+import { FormEvent, useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { Award, CalendarPlus, CheckCircle2, Download, FileText, GraduationCap, MessageSquarePlus, StickyNote, Trash2, Users, XCircle } from "lucide-react";
+import { api, ApiError } from "../../api/client";
+import { useAuth } from "../../auth/AuthContext";
 import { useToast } from "../../components/Toast";
-import { Avatar, Badge, Button, Card, CardHeader, EmptyState, PageSpinner, StatTile } from "../../components/ui";
+import { Avatar, Badge, Button, Card, CardHeader, EmptyState, PageSpinner, Select, StatTile, Textarea } from "../../components/ui";
+import { BarChart } from "../../components/charts";
 
 interface StudentFull {
   usn: string;
@@ -11,6 +13,7 @@ interface StudentFull {
   section: string | null;
   admissionYear: number;
   currentSemester: number;
+  proctorId: number | null;
   quota: string | null;
   fatherName: string | null;
   fatherPhone: string | null;
@@ -39,6 +42,28 @@ interface Claim {
   submittedAt: string;
 }
 
+interface Note {
+  id: number;
+  usn: string;
+  authorId: number;
+  note: string;
+  createdAt: string;
+  author: { name: string; shortCode: string };
+}
+
+interface Comparison {
+  cgpa: number | null;
+  section: { label: string; avgCgpa: number | null; percentile: number | null; rank: number | null; of: number } | null;
+  semester: { label: string; avgCgpa: number | null; percentile: number | null; rank: number | null; of: number };
+}
+
+interface ProctorOption {
+  facultyId: number;
+  name: string;
+  shortCode: string;
+  role: string;
+}
+
 function InfoField({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -50,12 +75,24 @@ function InfoField({ label, value }: { label: string; value: string }) {
 
 export default function StudentDetail({ base }: { base: string }) {
   const { usn } = useParams<{ usn: string }>();
+  const { auth } = useAuth();
   const toast = useToast();
   const [student, setStudent] = useState<StudentFull | null>(null);
   const [results, setResults] = useState<{ results: EffectiveRow[]; sgpaBySemester: Record<string, number | null>; cgpa: number | null; backlogSubjects: { subjectCode: string; semester: number }[] } | null>(null);
   const [activity, setActivity] = useState<{ claims: Claim[]; runningTotal: number } | null>(null);
+  const [notes, setNotes] = useState<Note[] | null>(null);
+  const [noteText, setNoteText] = useState("");
+  const [addingNote, setAddingNote] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [comparison, setComparison] = useState<Comparison | null>(null);
+  const [proctorOptions, setProctorOptions] = useState<ProctorOption[]>([]);
+  const [reassigning, setReassigning] = useState(false);
+
+  function loadNotes() {
+    if (!usn) return;
+    api.get(`/students/${usn}/notes`).then(setNotes);
+  }
 
   useEffect(() => {
     if (!usn) return;
@@ -68,7 +105,57 @@ export default function StudentDetail({ base }: { base: string }) {
         setActivity(a);
       })
       .catch((e) => setError(e.message ?? "Failed to load student"));
+    loadNotes();
+    api.get(`/students/${usn}/analytics/comparison`).then(setComparison);
   }, [usn]);
+
+  useEffect(() => {
+    if (auth?.role === "ADMIN") {
+      api.get("/proctors").then((r) => setProctorOptions(r.filter((f: ProctorOption) => f.role === "PROCTOR")));
+    }
+  }, [auth]);
+
+  async function handleReassign(e: React.ChangeEvent<HTMLSelectElement>) {
+    if (!usn) return;
+    const proctorId = e.target.value === "" ? null : parseInt(e.target.value, 10);
+    setReassigning(true);
+    try {
+      await api.patch(`/students/${usn}/proctor`, { proctorId });
+      const refreshed = await api.get(`/students/${usn}`);
+      setStudent(refreshed);
+      toast.success("Proctor updated");
+    } catch (err) {
+      toast.error("Couldn't reassign", err instanceof ApiError ? err.message : "Please try again.");
+    } finally {
+      setReassigning(false);
+    }
+  }
+
+  async function submitNote(e: FormEvent) {
+    e.preventDefault();
+    if (!usn || !noteText.trim()) return;
+    setAddingNote(true);
+    try {
+      await api.post(`/students/${usn}/notes`, { note: noteText.trim() });
+      setNoteText("");
+      loadNotes();
+      toast.success("Note added");
+    } catch (err) {
+      toast.error("Couldn't add note", err instanceof ApiError ? err.message : "Please try again.");
+    } finally {
+      setAddingNote(false);
+    }
+  }
+
+  async function deleteNote(id: number) {
+    if (!usn) return;
+    try {
+      await api.delete(`/students/${usn}/notes/${id}`);
+      loadNotes();
+    } catch (err) {
+      toast.error("Couldn't remove note", err instanceof ApiError ? err.message : "Please try again.");
+    }
+  }
 
   async function downloadReport() {
     if (!usn) return;
@@ -109,9 +196,18 @@ export default function StudentDetail({ base }: { base: string }) {
               </p>
             </div>
           </div>
-          <Button onClick={downloadReport} disabled={downloading} icon={downloading ? undefined : Download} className="shrink-0">
-            {downloading ? "Preparing..." : "Parent Summary Report"}
-          </Button>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {base === "/proctor" && (
+              <Link to={`${base}/calendar?usn=${student.usn}`}>
+                <Button variant="secondary" icon={CalendarPlus}>
+                  Record PTM
+                </Button>
+              </Link>
+            )}
+            <Button onClick={downloadReport} disabled={downloading} icon={downloading ? undefined : Download}>
+              {downloading ? "Preparing..." : "Parent Summary Report"}
+            </Button>
+          </div>
         </div>
         <div className="grid grid-cols-1 gap-5 px-5 py-4 sm:grid-cols-2 lg:grid-cols-3">
           <InfoField label="Father" value={`${student.fatherName ?? "-"} (${student.fatherPhone ?? "-"})`} />
@@ -119,7 +215,21 @@ export default function StudentDetail({ base }: { base: string }) {
           <InfoField label="Quota" value={student.quota ?? "-"} />
           <InfoField label="Local Address" value={student.localAddress ?? "-"} />
           <InfoField label="Local Guardian" value={`${student.localGuardianName ?? "-"} (${student.localGuardianPhone ?? "-"})`} />
-          <InfoField label="Proctor" value={student.proctor ? `${student.proctor.name} (${student.proctor.shortCode})` : "Unassigned"} />
+          {auth?.role === "ADMIN" ? (
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Proctor</div>
+              <Select value={student.proctorId ?? ""} onChange={handleReassign} disabled={reassigning} className="mt-0.5 py-1.5 text-sm">
+                <option value="">Unassigned</option>
+                {proctorOptions.map((p) => (
+                  <option key={p.facultyId} value={p.facultyId}>
+                    {p.name} ({p.shortCode})
+                  </option>
+                ))}
+              </Select>
+            </div>
+          ) : (
+            <InfoField label="Proctor" value={student.proctor ? `${student.proctor.name} (${student.proctor.shortCode})` : "Unassigned"} />
+          )}
         </div>
       </Card>
 
@@ -129,6 +239,35 @@ export default function StudentDetail({ base }: { base: string }) {
         <StatTile label="Activity Points" value={activity?.runningTotal ?? 0} tone="amber" icon={Award} />
         <StatTile label="Pending Claims" value={activity?.claims.filter((c) => c.status === "PENDING").length ?? 0} />
       </div>
+
+      {comparison && comparison.cgpa !== null && (
+        <Card>
+          <CardHeader title="Cohort Comparison" subtitle="CGPA next to the section and the wider semester cohort." icon={Users} />
+          <div className="px-5 py-5">
+            <BarChart
+              bars={[
+                { label: "Student", value: comparison.cgpa, color: "#00519c" },
+                ...(comparison.section ? [{ label: comparison.section.label, value: comparison.section.avgCgpa ?? 0, color: "#94a3b8" }] : []),
+                { label: comparison.semester.label, value: comparison.semester.avgCgpa ?? 0, color: "#cbd5e1" },
+              ]}
+              max={10}
+              height={150}
+            />
+            <div className="mt-4 flex flex-wrap gap-2">
+              {comparison.section && comparison.section.rank !== null && (
+                <Badge tone="blue">
+                  Section rank #{comparison.section.rank} of {comparison.section.of}
+                </Badge>
+              )}
+              {comparison.semester.rank !== null && (
+                <Badge tone="slate">
+                  Semester rank #{comparison.semester.rank} of {comparison.semester.of}
+                </Badge>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Card>
         <CardHeader title="Academic Record" subtitle="Precedence-resolved effective result per subject; full history is append-only." icon={FileText} />
@@ -210,6 +349,45 @@ export default function StudentDetail({ base }: { base: string }) {
               ))}
             </tbody>
           </table>
+        )}
+      </Card>
+
+      <Card>
+        <CardHeader title="Proctor's Notes" subtitle="Private staff remarks — not visible to the student." icon={StickyNote} />
+        <div className="border-b border-slate-100 px-5 py-4">
+          <form onSubmit={submitNote} className="flex flex-col gap-2 sm:flex-row sm:items-start">
+            <Textarea
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              placeholder="Add a remark — e.g. spoke to parents, recommend for scholarship..."
+              rows={2}
+              className="flex-1"
+            />
+            <Button type="submit" disabled={addingNote || !noteText.trim()} icon={MessageSquarePlus} className="shrink-0">
+              Add
+            </Button>
+          </form>
+        </div>
+        {!notes || notes.length === 0 ? (
+          <EmptyState message="No notes yet." icon={StickyNote} />
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {notes.map((n) => (
+              <li key={n.id} className="flex items-start justify-between gap-3 px-5 py-3 text-sm">
+                <div className="min-w-0">
+                  <p className="whitespace-pre-wrap text-slate-700">{n.note}</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {n.author.name} ({n.author.shortCode}) · {new Date(n.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                {(auth?.role === "ADMIN" || (auth && "facultyId" in auth.profile && auth.profile.facultyId === n.authorId)) && (
+                  <button type="button" onClick={() => deleteNote(n.id)} className="shrink-0 rounded-md p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-600">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
       </Card>
     </div>

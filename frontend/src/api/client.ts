@@ -62,6 +62,8 @@ export const api = {
       body: JSON.stringify(body ?? {}),
     }).then((r) => handle(path, r)),
 
+  delete: (path: string) => fetch(`${BASE}${path}`, { method: "DELETE", credentials: "include" }).then((r) => handle(path, r)),
+
   upload: (path: string, form: FormData) =>
     fetch(`${BASE}${path}`, { method: "POST", credentials: "include", body: form }).then((r) => handle(path, r)),
 
