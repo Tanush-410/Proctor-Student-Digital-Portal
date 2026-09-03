@@ -12,7 +12,7 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     region: singapore # closest to the ap-northeast-2 Supabase project; also: oregon, frankfurt
-    plan: starter # "free" also works but has no persistent disk (see the disk block below)
+    plan: free # no persistent disk, sleeps after 15 min idle (~50s cold start), plenty for a demo
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
@@ -39,10 +39,11 @@ services:
       #   sync: false
       # - key: SMTP_FROM
       #   sync: false
-    # Persistent storage for uploaded activity-point proof files. Requires a
-    # paid instance (starter+). On the free plan, delete this block — proof
-    # files then reset on every redeploy/restart, everything else still works.
-    disk:
-      name: proof-uploads
-      mountPath: /data
-      sizeGB: 1
+    #
+    # No persistent disk on the free plan — uploaded activity-point proof files
+    # live under UPLOADS_DIR on the instance's ephemeral filesystem and are lost
+    # on every redeploy/restart. To keep them, switch `plan` to `starter` and add:
+    #   disk:
+    #     name: proof-uploads
+    #     mountPath: /data
+    #     sizeGB: 1
