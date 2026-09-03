@@ -24,7 +24,10 @@ below. See "Security" below for the details behind all of the above.
 ```
 backend/
   prisma/schema.prisma    — the ER model from Section 5, plus Session/OTP/ImportException
-  prisma/seed.ts          — sample Admin/Proctor/Student accounts and academic data
+  prisma/data/cohort.json — the real cohort (HOD + PN/MVM + 70 students + 372 results); `npm run seed`
+  prisma/data/buildCohort.ts — rebuilds cohort.json from the department spreadsheets + resultsData.ts
+  prisma/seed.ts          — 7 fictional demo accounts; `npm run seed:demo`
+  prisma/seedScale.ts     — 100 faculty / 3000 students synthetic dataset; `npm run seed:scale`
   src/app.ts              — Express app: /api routes only, no listen() (imported by both index.ts and tests)
   src/index.ts            — production static-file serving, session/OTP cleanup, app.listen()
   src/modules/            — one folder per service from Section 3 (auth, ingestion, results,
@@ -45,13 +48,18 @@ frontend/
 ## Running it locally
 
 Create a free [Supabase](https://supabase.com) project, then copy `backend/.env.example` to
-`backend/.env` and fill in `DATABASE_URL` (pooled, :6543) and `DIRECT_URL` (direct, :5432) from
-its Project Settings -> Database -> Connection string page.
+`backend/.env` and fill in `DATABASE_URL` (pooled, `:6543`, keep `?pgbouncer=true`) and
+`DIRECT_URL` (direct, `:5432`) — the project dashboard's **Connect** button → **ORMs → Prisma**
+gives you both lines pre-formatted. Also copy `.env.example` (repo root) to `.env` with the same
+two values (docker compose reads it).
+
+> If you were handed an existing `.env` (e.g. to share a populated database), just drop it in and
+> skip `npm run seed` — the data is already there.
 
 From the repo root:
 
 ```bash
-npm run setup   # installs both workspaces, runs the Prisma migration, seeds sample data
+npm run setup   # installs both workspaces, runs the Prisma migration, loads the real cohort
 npm run dev     # runs backend (:4000) and frontend (:5173) together
 ```
 
@@ -61,8 +69,8 @@ Or manually, in two terminals:
 # 1. Backend — http://localhost:4000
 cd backend
 npm install
-npx prisma migrate dev   # first run only; creates dev.db
-npm run seed             # loads sample Admin/Proctor/Student accounts
+npx prisma migrate dev   # first run only
+npm run seed             # loads the real cohort (Shuba V Rao + PN/MVM + 70 students)
 npm run dev
 
 # 2. Frontend — http://localhost:5173
@@ -71,30 +79,49 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173. Log in with any seeded e-mail below; the OTP screen shows the
+Open http://localhost:5173. Log in with a seeded e-mail below; the OTP screen shows the
 code directly (dev mode has no mail service configured).
 
-| Role    | E-mail                        |
-|---------|--------------------------------|
-| Admin   | hod.cse@bmsce.ac.in            |
-| Proctor | anjali.rao@bmsce.ac.in         |
-| Proctor | sunil.kumar@bmsce.ac.in        |
-| Student | aarav.sharma@bmsce.ac.in       |
-| Student | diya.nair@bmsce.ac.in          |
-| Student | kabir.patel@bmsce.ac.in        |
-| Student | meera.krishnan@bmsce.ac.in     |
+| Role        | E-mail                          | Notes |
+|-------------|---------------------------------|-------|
+| Admin (HOD) | `shuba.rao@bmsce.ac.in`         | sees all 70 students, both proctors |
+| Proctor     | `praveen.cse@bmsce.ac.in`       | 35 proctees (USN `1WA24CS153`–`187`) |
+| Proctor     | `megavalli.cse@bmsce.ac.in`     | 35 proctees (USN `1WA24CS292`–`328`) |
+| Student     | `madhavkrishnan.cs24@bmsce.ac.in` | clean all-`O` record |
+| Student     | `kushads.cs24@bmsce.ac.in`      | one backlog (Linear Algebra) |
+| Student     | `tanmayatmakur.cs24@bmsce.ac.in` | three backlogs |
 
-`diya.nair@bmsce.ac.in` is seeded to demonstrate the precedence engine end-to-end: a
-provisional self-entry that disagrees with the eventual official result (discrepancy flag), and
-a subject that failed on `MAIN` and was cleared via `SUPPLEMENTARY`.
+`npm run seed` loads `prisma/data/cohort.json`: HOD Shuba V Rao, proctors Praveen N and
+Megavalli M, their **70 students** (with admission details), and **372** 4th-sem result records.
+It's the actual data the live app runs on, so this repository **must stay private** — it
+contains real student PII (names, phones, addresses, parents' details, exam results).
+
+The snapshot is rebuilt from the department source files by `npm run seed:build`:
+`~/Downloads/3rd sem Section wise class list FINAL.xlsx` (roster + proctor codes),
+`~/Downloads/UG-ONLINE ADMN. DETAILES-2024-25-[UG].xlsx` (admission details, joined by e-mail),
+and `prisma/data/resultsData.ts` (the 4th-sem marks). The marks were **hand-transcribed from a
+scanned provisional result sheet** and cross-checked against OCR; **subject credits are assumed**
+(see `resultsData.ts`). Verify against the official records before relying on SGPA/CGPA. Seven
+students in the proctor lists aren't on the result sheet and one is marked "TAL" — they have no
+result rows.
 
 As Admin, use the **Faculty** tab to onboard new proctors — there's no other way to add one
-short of editing `prisma/seed.ts`.
+short of editing the seed.
+
+### Demo data (7 fake accounts)
+
+```bash
+cd backend
+npm run seed:demo   # Ramesh Iyer (Admin) + 2 proctors + 4 students, all fictional
+```
+
+`prisma/seed.ts` is a tiny hand-authored dataset for a quick look without the real cohort.
+`diya.nair@bmsce.ac.in` there demonstrates the precedence engine end-to-end (a provisional
+self-entry that disagrees with the official result, and a `MAIN` fail cleared via `SUPPLEMENTARY`).
 
 ### Seeding at scale (100 faculty, 3000 students)
 
-`prisma/seed.ts` above is a small hand-authored demo (7 accounts) — good for a quick look.
-`prisma/seedScale.ts` generates a much larger, realistic dataset instead: 100 faculty (5 Admin,
+`prisma/seedScale.ts` generates a large synthetic dataset for load/pagination testing: 100 faculty (5 Admin,
 95 Proctor), 3000 students across four admission cohorts (2022–2025), each with a full result
 history for **every** semester from admission through their current one — not just their latest
 — roughly 80,000 result records total, plus ~1,400 activity-point claims and ~190 PTM records.
@@ -154,6 +181,28 @@ regression test:
   creation/update.
 
 ## Deployment
+
+### Render (managed, via `render.yaml`)
+
+The repo ships a Render Blueprint that runs the Dockerfile as one web service —
+no Caddy needed, Render terminates TLS itself.
+
+1. **render.com → New → Blueprint**, connect this repo, branch `tanimies`.
+2. Render reads `render.yaml` and prompts for `DATABASE_URL` and `DIRECT_URL` —
+   paste the Supabase strings (Project → Connect → ORMs → Prisma).
+3. Deploy. On start the container runs `prisma migrate deploy`; the data is
+   already in Supabase, so no seeding.
+4. **Logging in:** with no `SMTP_*` set, OTP codes appear only in the Render
+   **Logs** tab. For real users, uncomment the `SMTP_*` block in `render.yaml`
+   and fill it in.
+
+The `disk:` block (persistent storage for uploaded proof files) needs a paid
+instance; on the free plan, delete that block — proof files then reset on each
+redeploy, nothing else changes. `npm run seed` needs dev dependencies
+(`tsx`), so run it from a laptop pointed at the database, not the Render shell.
+
+Railway / Fly.io work the same way (they build the Dockerfile) — set the same
+env vars and mount a volume at `/data`.
 
 ### Docker (recommended)
 
@@ -335,6 +384,10 @@ and the thing the original test suite was built around proving.
   assumption made here is documented in `backend/src/modules/results/engine.ts`.
 - **Grading scale**: standard 10-point scale (O=10 … F=0), since the design document doesn't
   specify one.
+- **Parent summary report has a charts page.** `src/modules/reports/pdf.ts` adds a second PDF page
+  with four panels drawn as PDFKit vector graphics (no chart library, no image files): SGPA trend
+  line with a CGPA reference, grade distribution, latest-semester subject marks with a pass line,
+  and an activity-points progress bar. Each panel shows "No data yet" when there are no results.
 - **Faculty management (`POST`/`PATCH /faculty`)** isn't in the design doc's use-case diagrams —
   faculty accounts were assumed pre-existing — but an Admin portal with no way to onboard a
   proctor can't actually be operated day to day, so it was added.

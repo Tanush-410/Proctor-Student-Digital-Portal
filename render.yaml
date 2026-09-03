@@ -1,0 +1,48 @@
+# Render Blueprint — deploys the whole app (API + built frontend) from the
+# existing Dockerfile as one persistent web service.
+#
+# Setup: render.com -> New -> Blueprint -> connect this repo (branch tanimies).
+# Render reads this file, then asks you for the two values marked `sync: false`.
+#
+# The database is Supabase (already hosted) — this only runs the app.
+services:
+  - type: web
+    name: proctor-diary
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    region: singapore # closest to the ap-northeast-2 Supabase project; also: oregon, frankfurt
+    plan: starter # "free" also works but has no persistent disk (see the disk block below)
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Supabase connection strings — paste when prompted (Project -> Connect -> ORMs -> Prisma).
+      # DATABASE_URL = transaction pooler :6543 with ?pgbouncer=true
+      # DIRECT_URL   = session pooler :5432 (used by `prisma migrate deploy` on start)
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: UPLOADS_DIR
+        value: /data/uploads
+      # Real OTP e-mail delivery. Without these, login codes only appear in the
+      # Render logs (Logs tab) — fine for testing, not for real users.
+      # - key: SMTP_HOST
+      #   sync: false
+      # - key: SMTP_PORT
+      #   value: "587"
+      # - key: SMTP_USER
+      #   sync: false
+      # - key: SMTP_PASS
+      #   sync: false
+      # - key: SMTP_FROM
+      #   sync: false
+    # Persistent storage for uploaded activity-point proof files. Requires a
+    # paid instance (starter+). On the free plan, delete this block — proof
+    # files then reset on every redeploy/restart, everything else still works.
+    disk:
+      name: proof-uploads
+      mountPath: /data
+      sizeGB: 1
