@@ -11,6 +11,9 @@ import { calendarRouter } from "./modules/calendar/routes";
 import { facultyRouter } from "./modules/faculty/routes";
 import { studentsRouter } from "./modules/students/routes";
 import { reportsRouter } from "./modules/reports/routes";
+import { scanRouter } from "./modules/scan/routes";
+import { notificationsRouter } from "./modules/notifications/routes";
+import { auditRouter } from "./modules/audit/routes";
 
 export function createApp(options: { enforceHttps?: boolean } = {}) {
   const app = express();
@@ -106,6 +109,9 @@ export function createApp(options: { enforceHttps?: boolean } = {}) {
   api.use("/", facultyRouter);
   api.use("/students", studentsRouter);
   api.use("/", reportsRouter);
+  api.use("/", scanRouter);
+  api.use("/", notificationsRouter);
+  api.use("/", auditRouter);
 
   app.use("/api", api);
 

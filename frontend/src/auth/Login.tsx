@@ -54,7 +54,9 @@ export default function Login() {
         <div className="pointer-events-none absolute -bottom-32 -left-16 h-96 w-96 rounded-full bg-brand-900/40 blur-3xl" />
 
         <div className="relative flex items-center gap-2.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-lg font-bold text-white backdrop-blur-sm">PD</div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white p-1.5 shadow-soft">
+            <img src="/bms-logo.svg" alt="BMSCE" className="h-full w-full" />
+          </div>
           <span className="text-lg font-semibold text-white">Proctor Diary</span>
         </div>
 
@@ -83,7 +85,9 @@ export default function Login() {
       <div className="flex items-center justify-center bg-slate-50 px-4 py-12">
         <div className="w-full max-w-sm">
           <div className="mb-8 text-center lg:hidden">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-lg font-bold text-white shadow-soft">PD</div>
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-white p-2 shadow-soft ring-1 ring-slate-200/80">
+              <img src="/bms-logo.svg" alt="BMSCE" className="h-full w-full" />
+            </div>
             <h1 className="text-xl font-semibold text-slate-900">Proctor Diary</h1>
           </div>
 

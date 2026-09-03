@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Pencil, Search, UserPlus, Users } from "lucide-react";
 import { api, ApiError } from "../../api/client";
 import { useToast } from "../../components/Toast";
@@ -192,10 +193,10 @@ export default function AdminFaculty() {
                 {filtered.map((f) => (
                   <tr key={f.facultyId} className="border-t border-slate-100 transition-colors hover:bg-slate-50/70">
                     <td className="px-5 py-2.5">
-                      <div className="flex items-center gap-2.5">
+                      <Link to={`/admin/faculty/${f.facultyId}`} className="group flex items-center gap-2.5">
                         <Avatar name={f.name} size="sm" />
-                        <span className="font-medium text-slate-800">{f.name}</span>
-                      </div>
+                        <span className="font-medium text-slate-800 group-hover:text-brand-700">{f.name}</span>
+                      </Link>
                     </td>
                     <td className="px-5 py-2.5 font-mono text-xs text-slate-500">{f.shortCode}</td>
                     <td className="px-5 py-2.5">

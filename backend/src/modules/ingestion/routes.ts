@@ -3,6 +3,16 @@ import { prisma } from "../../db";
 import { AuthedRequest, requireAuth, requireRole } from "../../middleware/session";
 import { allocateStudents, normaliseKeys, parseSheet, requireEmailColumn } from "./engine";
 import { safeRouter } from "../../lib/asyncSafeRouter";
+import { logAudit } from "../../lib/audit";
+import { notify } from "../../lib/notify";
+
+async function notifyAdminsOfExceptions(count: number, batchId: number, sourceType: string) {
+  if (count === 0) return;
+  const admins = await prisma.faculty.findMany({ where: { role: "ADMIN" } });
+  for (const admin of admins) {
+    notify(admin.facultyId, "IMPORT_EXCEPTIONS", `${sourceType} upload landed ${count} exception(s)`, `Batch #${batchId} needs review.`, "/admin/exceptions");
+  }
+}
 
 export const ingestionRouter = safeRouter();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -37,6 +47,8 @@ ingestionRouter.post(
       "CLASS_LIST"
     );
 
+    await notifyAdminsOfExceptions(summary.exceptions, summary.batchId, "Class-list");
+    logAudit(req, "UPLOAD", "ImportBatch", String(summary.batchId), { sourceType: "CLASS_LIST", created: summary.created, updated: summary.updated });
     res.json(summary);
   }
 );
@@ -103,6 +115,8 @@ ingestionRouter.post(
       data: { errorCount: exceptions.length + errors.length },
     });
 
+    await notifyAdminsOfExceptions(exceptions.length, batch.batchId, "Admission-data");
+    logAudit(req, "UPLOAD", "ImportBatch", String(batch.batchId), { sourceType: "ADMISSION_DATA", updated });
     res.json({ batchId: batch.batchId, updated, exceptions: exceptions.length, errors });
   }
 );
@@ -129,9 +143,10 @@ ingestionRouter.get("/import-exceptions", requireAuth, requireRole("ADMIN", "PRO
   res.json(exceptions.map((e) => ({ ...e, rawData: JSON.parse(e.rawData) })));
 });
 
-ingestionRouter.patch("/import-exceptions/:id/resolve", requireAuth, requireRole("ADMIN", "PROCTOR"), async (req, res) => {
+ingestionRouter.patch("/import-exceptions/:id/resolve", requireAuth, requireRole("ADMIN", "PROCTOR"), async (req: AuthedRequest, res) => {
   const id = parseInt(req.params.id, 10);
   const updated = await prisma.importException.update({ where: { id }, data: { resolved: true } });
+  logAudit(req, "RESOLVE", "ImportException", String(id));
   res.json(updated);
 });
 
@@ -146,5 +161,6 @@ ingestionRouter.post("/cohort/promote", requireAuth, requireRole("ADMIN"), async
     where,
     data: { currentSemester: { increment: 1 } },
   });
+  logAudit(req, "PROMOTE_COHORT", "Student", section ?? "ALL", { promoted: result.count, maxSemester });
   res.json({ promoted: result.count });
 });

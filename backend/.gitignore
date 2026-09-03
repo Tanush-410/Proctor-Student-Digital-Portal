@@ -9,3 +9,4 @@ uploads/proofs/*
 uploads/imports/*
 !uploads/imports/.gitkeep
 .env
+*.traineddata

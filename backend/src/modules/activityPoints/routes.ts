@@ -8,6 +8,8 @@ import { AuthedRequest, requireAuth, requireRole } from "../../middleware/sessio
 import { safeRouter } from "../../lib/asyncSafeRouter";
 import { UPLOADS_DIR } from "../../lib/config";
 import { InvalidFileTypeError } from "../../lib/errors";
+import { logAudit } from "../../lib/audit";
+import { notify } from "../../lib/notify";
 
 export const activityPointsRouter = safeRouter();
 
@@ -97,6 +99,9 @@ activityPointsRouter.post("/activity-points/claims", requireAuth, requireRole("S
       status: "PENDING",
     },
   });
+  if (student.proctorId) {
+    notify(student.proctorId, "CLAIM_SUBMITTED", `${student.name} submitted a claim`, `${parsed.data.requestedPoints} pts — "${parsed.data.description}"`, `/proctor/activity-points`);
+  }
   res.status(201).json(claim);
 });
 
@@ -174,5 +179,6 @@ activityPointsRouter.patch("/activity-points/claims/:id/review", requireAuth, re
     },
   });
 
+  logAudit(req, decision === "APPROVED" ? "APPROVE" : "REJECT", "ActivityPointClaim", String(id), { usn: claim.usn, grantedPoints });
   res.json({ claim: updated, runningTotal: await computeRunningTotal(claim.usn) });
 });

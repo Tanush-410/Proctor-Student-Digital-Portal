@@ -3,6 +3,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { LogOut, Menu, X, type LucideIcon } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar, Badge } from "../components/ui";
+import { NotificationBell } from "../components/NotificationBell";
 
 interface Tab {
   to: string;
@@ -21,8 +22,8 @@ export default function PortalLayout({ tabs, portalName }: { tabs: Tab[]; portal
   const sidebarContent = (
     <>
       <div className="flex items-center gap-2.5 px-5 py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white shadow-soft">
-          PD
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-soft ring-1 ring-slate-200/80">
+          <img src="/bms-logo.svg" alt="BMSCE" className="h-7 w-7" />
         </div>
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold tracking-tight text-slate-900">Proctor Diary</div>
@@ -86,12 +87,17 @@ export default function PortalLayout({ tabs, portalName }: { tabs: Tab[]; portal
       {/* Mobile top bar + drawer */}
       <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 lg:hidden">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 text-xs font-bold text-white">PD</div>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white ring-1 ring-slate-200/80">
+            <img src="/bms-logo.svg" alt="BMSCE" className="h-5 w-5" />
+          </div>
           <span className="text-sm font-semibold text-slate-900">Proctor Diary</span>
         </div>
-        <button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
-          <Menu className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          {auth.role !== "STUDENT" && <NotificationBell />}
+          <button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
+            <Menu className="h-5 w-5" />
+          </button>
+        </div>
       </div>
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
@@ -106,6 +112,11 @@ export default function PortalLayout({ tabs, portalName }: { tabs: Tab[]; portal
       )}
 
       <main className="lg:pl-64">
+        {auth.role !== "STUDENT" && (
+          <div className="sticky top-0 z-20 hidden justify-end border-b border-slate-200/70 bg-slate-50/80 px-4 py-2.5 backdrop-blur sm:px-6 lg:flex lg:px-8">
+            <NotificationBell />
+          </div>
+        )}
         <div className="animate-in mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
           <Outlet />
         </div>

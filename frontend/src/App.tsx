@@ -11,6 +11,10 @@ import {
   Award,
   BookOpen,
   IdCard,
+  ScanLine,
+  Scale,
+  BarChart3,
+  History,
 } from "lucide-react";
 import { useAuth } from "./auth/AuthContext";
 import Login from "./auth/Login";
@@ -21,6 +25,9 @@ import UploadData from "./portals/admin/UploadData";
 import PromoteCohort from "./portals/admin/PromoteCohort";
 import ImportExceptions from "./portals/admin/ImportExceptions";
 import AdminFaculty from "./portals/admin/AdminFaculty";
+import AdminWorkload from "./portals/admin/AdminWorkload";
+import AdminAnalytics from "./portals/admin/AdminAnalytics";
+import AuditLog from "./portals/admin/AuditLog";
 
 import ProctorDashboard from "./portals/proctor/ProctorDashboard";
 import UploadResults from "./portals/proctor/UploadResults";
@@ -34,20 +41,27 @@ import MyInfo from "./portals/student/MyInfo";
 
 import Directory from "./portals/shared/Directory";
 import StudentDetail from "./portals/shared/StudentDetail";
+import FacultyDetail from "./portals/shared/FacultyDetail";
+import ScanImport from "./portals/shared/ScanImport";
 
 const adminTabs = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { to: "/admin/upload", label: "Upload", icon: UploadCloud },
+  { to: "/admin/scan", label: "Scan Import", icon: ScanLine },
   { to: "/admin/promote", label: "Promote Cohort", icon: TrendingUp },
   { to: "/admin/directory", label: "Directory", icon: Users },
   { to: "/admin/exceptions", label: "Exceptions", icon: AlertTriangle },
   { to: "/admin/faculty", label: "Faculty", icon: GraduationCap },
+  { to: "/admin/workload", label: "Workload", icon: Scale },
+  { to: "/admin/audit-log", label: "Audit Log", icon: History },
 ];
 
 const proctorTabs = [
   { to: "/proctor", label: "Dashboard", icon: LayoutDashboard },
   { to: "/proctor/directory", label: "Directory", icon: Users },
   { to: "/proctor/upload", label: "Upload Results", icon: FileSpreadsheet },
+  { to: "/proctor/scan", label: "Scan Import", icon: ScanLine },
   { to: "/proctor/calendar", label: "Calendar / PTM", icon: CalendarDays },
   { to: "/proctor/activity-points", label: "Activity Points", icon: Award },
 ];
@@ -94,11 +108,16 @@ export default function App() {
       >
         <Route index element={<AdminDashboard />} />
         <Route path="upload" element={<UploadData />} />
+        <Route path="scan" element={<ScanImport base="/admin" />} />
         <Route path="promote" element={<PromoteCohort />} />
         <Route path="directory" element={<Directory role="ADMIN" />} />
         <Route path="exceptions" element={<ImportExceptions />} />
         <Route path="faculty" element={<AdminFaculty />} />
+        <Route path="faculty/:id" element={<FacultyDetail base="/admin" />} />
         <Route path="students/:usn" element={<StudentDetail base="/admin" />} />
+        <Route path="workload" element={<AdminWorkload />} />
+        <Route path="analytics" element={<AdminAnalytics />} />
+        <Route path="audit-log" element={<AuditLog />} />
       </Route>
 
       <Route
@@ -112,8 +131,10 @@ export default function App() {
         <Route index element={<ProctorDashboard />} />
         <Route path="directory" element={<Directory role="PROCTOR" />} />
         <Route path="upload" element={<UploadResults />} />
+        <Route path="scan" element={<ScanImport base="/proctor" />} />
         <Route path="calendar" element={<Calendar />} />
         <Route path="activity-points" element={<ActivityPointsReview />} />
+        <Route path="faculty/:id" element={<FacultyDetail base="/proctor" />} />
         <Route path="students/:usn" element={<StudentDetail base="/proctor" />} />
       </Route>
 

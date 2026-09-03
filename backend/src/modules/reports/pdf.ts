@@ -1,3 +1,5 @@
+import path from "path";
+import fs from "fs";
 import PDFDocument from "pdfkit";
 import { Response } from "express";
 import { Student, Faculty } from "@prisma/client";
@@ -10,7 +12,15 @@ export interface ParentSummaryData {
   cgpa: number | null;
   backlogSubjects: { subjectCode: string; semester: number }[];
   activityPointsTotal: number;
+  recentNotes?: { note: string; author: string; createdAt: Date }[];
+  rank?: { position: number; of: number } | null;
+  comparison?: {
+    section: { label: string; avgCgpa: number | null } | null;
+    semester: { label: string; avgCgpa: number | null };
+  } | null;
 }
+
+const LOGO_PATH = path.join(__dirname, "../../assets/bms-logo.png");
 
 /** AICTE activity-point requirement for the full UG programme (design doc, Section 8). */
 const REQUIRED_ACTIVITY_POINTS = 100;
@@ -36,9 +46,13 @@ export function buildParentSummaryPdf(data: ParentSummaryData, res: Response) {
   res.setHeader("Content-Disposition", `inline; filename="${data.student.usn}-parent-summary.pdf"`);
   doc.pipe(res);
 
+  if (fs.existsSync(LOGO_PATH)) {
+    doc.image(LOGO_PATH, doc.page.width / 2 - 22, doc.y, { width: 44, height: 44 });
+    doc.moveDown(3.2);
+  }
   doc.fontSize(18).text("Parent Summary Report", { align: "center" });
   doc.moveDown(0.5);
-  doc.fontSize(10).fillColor("gray").text("Online Proctor Diary & Student Academic Management System", { align: "center" });
+  doc.fontSize(10).fillColor("gray").text("BMS College of Engineering — Online Proctor Diary & Student Academic Management System", { align: "center" });
   doc.fillColor("black");
   doc.moveDown(1.5);
 
@@ -78,12 +92,26 @@ export function buildParentSummaryPdf(data: ParentSummaryData, res: Response) {
   }
 
   doc.moveDown(0.5);
-  doc.fontSize(11).text(`CGPA: ${data.cgpa ?? "N/A"}`);
+  const rankText = data.rank ? `  (Rank ${data.rank.position} of ${data.rank.of} among proctor's students)` : "";
+  doc.fontSize(11).text(`CGPA: ${data.cgpa ?? "N/A"}${rankText}`);
   doc.text(`Backlog Subjects: ${data.backlogSubjects.length === 0 ? "None" : data.backlogSubjects.map((b) => `${b.subjectCode} (Sem ${b.semester})`).join(", ")}`);
   doc.moveDown(1);
 
   doc.fontSize(13).text("Activity Points");
   doc.fontSize(10).text(`Total Approved Points: ${data.activityPointsTotal} / ${REQUIRED_ACTIVITY_POINTS} required`);
+  doc.moveDown(1);
+
+  if (data.recentNotes && data.recentNotes.length > 0) {
+    doc.fontSize(13).fillColor("black").text("Proctor's Remarks");
+    doc.moveDown(0.3);
+    doc.fontSize(9);
+    for (const n of data.recentNotes) {
+      doc.fillColor("#334155").text(`"${n.note}"`, { indent: 10 });
+      doc.fontSize(8).fillColor("#94a3b8").text(`— ${n.author}, ${new Date(n.createdAt).toLocaleDateString()}`, { indent: 10 });
+      doc.fontSize(9).moveDown(0.3);
+    }
+    doc.fillColor("black");
+  }
 
   // ---- Charts ----
   drawChartsPage(doc, data, semesters);
@@ -141,6 +169,24 @@ function drawChartsPage(doc: Doc, data: ParentSummaryData, semesters: number[]) 
   drawPanel(doc, left + colW + 24, top + rowH + 30, colW, rowH, "Activity Points", (x, y, w, h) => {
     progressBar(doc, x, y + h / 2 - 24, w, data.activityPointsTotal, REQUIRED_ACTIVITY_POINTS);
   });
+
+  // 5. Cohort comparison (full-width, third row) — this student's CGPA next
+  // to their section and semester-wide averages, so the report answers "how
+  // does this compare" without the parent having to do that math themselves.
+  if (data.comparison && data.cgpa !== null) {
+    const row3Y = top + rowH * 2 + 60;
+    const row3H = 150;
+    drawPanel(doc, left, row3Y, usableW, row3H, "Cohort Comparison — CGPA", (x, y, w, h) => {
+      const bars: { label: string; value: number; color?: string }[] = [{ label: "You", value: data.cgpa as number, color: "#2563eb" }];
+      if (data.comparison!.section && data.comparison!.section.avgCgpa !== null) {
+        bars.push({ label: data.comparison!.section.label, value: data.comparison!.section.avgCgpa, color: "#94a3b8" });
+      }
+      if (data.comparison!.semester.avgCgpa !== null) {
+        bars.push({ label: data.comparison!.semester.label, value: data.comparison!.semester.avgCgpa, color: "#cbd5e1" });
+      }
+      barChart(doc, x, y, w, h, bars, 10);
+    });
+  }
 }
 
 // ---------- chart primitives (PDFKit vector drawing) ----------

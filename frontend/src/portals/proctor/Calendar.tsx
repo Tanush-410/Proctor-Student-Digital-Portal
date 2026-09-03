@@ -1,14 +1,21 @@
 import { FormEvent, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { CalendarClock, CalendarPlus, Info } from "lucide-react";
 import { api, ApiError } from "../../api/client";
 import { useToast } from "../../components/Toast";
-import { Button, Card, CardHeader, EmptyState, Input, Label, SkeletonRows, Textarea } from "../../components/ui";
+import { Button, Card, CardHeader, EmptyState, Input, Label, Select, SkeletonRows, Textarea } from "../../components/ui";
 
 interface Ptm {
   ptmId: number;
   ptmDate: string;
   ptmTime: string;
   notes: string | null;
+  usn: string | null;
+}
+
+interface StudentRow {
+  usn: string;
+  name: string;
 }
 
 function formatDate(iso: string): string {
@@ -18,10 +25,13 @@ function formatDate(iso: string): string {
 
 export default function Calendar() {
   const toast = useToast();
+  const [searchParams] = useSearchParams();
   const [records, setRecords] = useState<Ptm[] | null>(null);
+  const [students, setStudents] = useState<StudentRow[]>([]);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
+  const [usn, setUsn] = useState(searchParams.get("usn") ?? "");
   const [busy, setBusy] = useState(false);
 
   function load() {
@@ -29,16 +39,20 @@ export default function Calendar() {
   }
 
   useEffect(load, []);
+  useEffect(() => {
+    api.get("/students?mine=true").then(setStudents);
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     try {
-      await api.post("/ptm", { ptmDate: date, ptmTime: time, notes: notes || undefined });
+      await api.post("/ptm", { ptmDate: date, ptmTime: time, notes: notes || undefined, usn: usn || undefined });
       toast.success("PTM recorded");
       setDate("");
       setTime("");
       setNotes("");
+      setUsn("");
       load();
     } catch (err) {
       toast.error("Couldn't save PTM", err instanceof ApiError ? err.message : "Please try again.");
@@ -69,6 +83,17 @@ export default function Calendar() {
           <div>
             <Label>Time</Label>
             <Input type="time" required value={time} onChange={(e) => setTime(e.target.value)} />
+          </div>
+          <div>
+            <Label>For Student (optional)</Label>
+            <Select value={usn} onChange={(e) => setUsn(e.target.value)}>
+              <option value="">General / not tied to one student</option>
+              {students.map((s) => (
+                <option key={s.usn} value={s.usn}>
+                  {s.name} ({s.usn})
+                </option>
+              ))}
+            </Select>
           </div>
           <div className="sm:col-span-3">
             <Label>Notes</Label>
@@ -101,6 +126,11 @@ export default function Calendar() {
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium text-slate-800">
                       {formatDate(r.ptmDate)} <span className="text-slate-400">at {r.ptmTime}</span>
+                      {r.usn && (
+                        <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-normal text-slate-500">
+                          {students.find((s) => s.usn === r.usn)?.name ?? r.usn}
+                        </span>
+                      )}
                     </div>
                     {r.notes && <div className="mt-0.5 text-sm text-slate-500">{r.notes}</div>}
                   </div>

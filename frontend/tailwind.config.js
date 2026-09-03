@@ -7,18 +7,29 @@ export default {
         sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
       },
       colors: {
+        // Anchored on BMSCE's crest blue (#00519C) at 600 — the shade every
+        // primary button/active-nav-state actually shows — so the app reads
+        // as genuinely BMS-branded next to the crest, not an unrelated
+        // colour scheme that happens to share a page with it.
         brand: {
-          50: "#f1f0ff",
-          100: "#e3e1ff",
-          200: "#c9c5ff",
-          300: "#a79fff",
-          400: "#8b7ffb",
-          500: "#6a5cf5",
-          600: "#5540e8",
-          700: "#4732c4",
-          800: "#3a299e",
-          900: "#302278",
-          950: "#1e1550",
+          50: "#eef6fc",
+          100: "#dcedfa",
+          200: "#b9daf5",
+          300: "#8ec1ec",
+          400: "#5a9fdb",
+          500: "#2c7cc4",
+          600: "#00519c",
+          700: "#00427d",
+          800: "#00335f",
+          900: "#032a4d",
+          950: "#041b32",
+        },
+        crimson: {
+          50: "#fef2f2",
+          100: "#fde3e2",
+          500: "#e30000",
+          600: "#c50000",
+          700: "#ab0600",
         },
       },
       boxShadow: {
