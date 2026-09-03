@@ -42,7 +42,7 @@ export default function PortalLayout({ tabs, portalName }: { tabs: Tab[]; portal
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
                 `group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 ${
-                  isActive ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                  isActive ? "bg-gradient-to-r from-brand-50 to-brand-50/30 text-brand-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                 }`
               }
             >
@@ -78,25 +78,29 @@ export default function PortalLayout({ tabs, portalName }: { tabs: Tab[]; portal
   );
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-slate-50 to-slate-100/70">
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-200 bg-white shadow-[1px_0_0_0_rgba(15,23,42,0.02)] lg:flex">
+        <div className="h-0.5 bg-gradient-to-r from-brand-600 via-brand-400 to-brand-600" />
         {sidebarContent}
       </aside>
 
       {/* Mobile top bar + drawer */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 lg:hidden">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white ring-1 ring-slate-200/80">
-            <img src="/bms-logo.svg" alt="BMSCE" className="h-5 w-5" />
+      <div className="border-b border-slate-200 bg-white lg:hidden">
+        <div className="h-0.5 bg-gradient-to-r from-brand-600 via-brand-400 to-brand-600" />
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white ring-1 ring-slate-200/80">
+              <img src="/bms-logo.svg" alt="BMSCE" className="h-5 w-5" />
+            </div>
+            <span className="text-sm font-semibold text-slate-900">Proctor Diary</span>
           </div>
-          <span className="text-sm font-semibold text-slate-900">Proctor Diary</span>
-        </div>
-        <div className="flex items-center gap-1">
-          {auth.role !== "STUDENT" && <NotificationBell />}
-          <button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
-            <Menu className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            {auth.role !== "STUDENT" && <NotificationBell />}
+            <button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
+              <Menu className="h-5 w-5" />
+            </button>
+          </div>
         </div>
       </div>
       {mobileOpen && (
@@ -113,7 +117,7 @@ export default function PortalLayout({ tabs, portalName }: { tabs: Tab[]; portal
 
       <main className="lg:pl-64">
         {auth.role !== "STUDENT" && (
-          <div className="sticky top-0 z-20 hidden justify-end border-b border-slate-200/70 bg-slate-50/80 px-4 py-2.5 backdrop-blur sm:px-6 lg:flex lg:px-8">
+          <div className="sticky top-0 z-20 hidden justify-end border-b border-slate-200/70 bg-white/70 px-4 py-2.5 backdrop-blur sm:px-6 lg:flex lg:px-8">
             <NotificationBell />
           </div>
         )}

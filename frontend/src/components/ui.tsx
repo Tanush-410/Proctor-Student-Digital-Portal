@@ -41,9 +41,10 @@ export function Button({
   icon?: LucideIcon;
 }) {
   const styles: Record<string, string> = {
-    primary: "bg-brand-600 text-white shadow-xs hover:bg-brand-700 active:bg-brand-800 disabled:bg-slate-300 disabled:shadow-none",
+    primary:
+      "bg-gradient-to-b from-brand-500 to-brand-600 text-white shadow-xs hover:from-brand-600 hover:to-brand-700 active:from-brand-700 active:to-brand-800 disabled:from-slate-300 disabled:to-slate-300 disabled:shadow-none",
     secondary: "bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 hover:border-slate-300 active:bg-slate-100 disabled:text-slate-400",
-    danger: "bg-red-600 text-white shadow-xs hover:bg-red-700 active:bg-red-800 disabled:bg-slate-300",
+    danger: "bg-gradient-to-b from-red-500 to-red-600 text-white shadow-xs hover:from-red-600 hover:to-red-700 active:from-red-700 active:to-red-800 disabled:from-slate-300 disabled:to-slate-300",
     ghost: "bg-transparent text-slate-600 hover:bg-slate-100 active:bg-slate-200",
   };
   const sizes: Record<string, string> = {
@@ -147,12 +148,12 @@ export function Label({ children }: { children: ReactNode }) {
   return <label className="mb-1.5 block text-xs font-medium text-slate-600">{children}</label>;
 }
 
-const STAT_TONE: Record<string, { text: string; iconBg: string; iconText: string }> = {
-  slate: { text: "text-slate-900", iconBg: "bg-slate-100", iconText: "text-slate-500" },
-  green: { text: "text-emerald-600", iconBg: "bg-emerald-50", iconText: "text-emerald-600" },
-  red: { text: "text-red-600", iconBg: "bg-red-50", iconText: "text-red-600" },
-  amber: { text: "text-amber-600", iconBg: "bg-amber-50", iconText: "text-amber-600" },
-  blue: { text: "text-brand-600", iconBg: "bg-brand-50", iconText: "text-brand-600" },
+const STAT_TONE: Record<string, { text: string; iconBg: string; iconText: string; accent: string }> = {
+  slate: { text: "text-slate-900", iconBg: "bg-slate-100", iconText: "text-slate-500", accent: "bg-slate-300" },
+  green: { text: "text-emerald-600", iconBg: "bg-emerald-50", iconText: "text-emerald-600", accent: "bg-emerald-500" },
+  red: { text: "text-red-600", iconBg: "bg-red-50", iconText: "text-red-600", accent: "bg-red-500" },
+  amber: { text: "text-amber-600", iconBg: "bg-amber-50", iconText: "text-amber-600", accent: "bg-amber-500" },
+  blue: { text: "text-brand-600", iconBg: "bg-brand-50", iconText: "text-brand-600", accent: "bg-brand-500" },
 };
 
 export function StatTile({
@@ -170,7 +171,8 @@ export function StatTile({
 }) {
   const t = STAT_TONE[tone];
   return (
-    <Card className="group relative overflow-hidden px-5 py-4 transition-shadow hover:shadow-popover">
+    <Card className="group relative overflow-hidden px-5 py-4 transition-all duration-200 ease-premium hover:-translate-y-0.5 hover:shadow-popover">
+      <div className={`absolute inset-x-0 top-0 h-0.5 ${t.accent} opacity-0 transition-opacity duration-200 group-hover:opacity-100`} />
       <div className="flex items-start justify-between">
         <div className="min-w-0">
           <div className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</div>
