@@ -1,10 +1,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Award, CalendarCheck, CalendarPlus, CheckCircle2, Clock, Download, FileText, GraduationCap, MessageSquarePlus, StickyNote, Trash2, Users, XCircle } from "lucide-react";
+import { Award, CalendarCheck, CalendarPlus, CheckCircle2, Clock, Download, FileText, GraduationCap, MessageSquarePlus, Paperclip, Sparkles, StickyNote, Trash2, Users, XCircle } from "lucide-react";
 import { api, ApiError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useToast } from "../../components/Toast";
-import { Avatar, Badge, Button, Card, CardHeader, EmptyState, PageSpinner, Select, StatTile, Textarea } from "../../components/ui";
+import { Avatar, Badge, Breadcrumb, Button, Card, CardHeader, EmptyState, PageSpinner, ResponsiveTable, Select, StatTile, Textarea } from "../../components/ui";
 import { BarChart } from "../../components/charts";
 
 interface StudentFull {
@@ -73,6 +73,24 @@ interface AttendanceSummary {
   recent: { id: number; date: string; status: string }[];
 }
 
+interface AccoladeItem {
+  id: number;
+  title: string;
+  description: string;
+  category: string | null;
+  proofFile: string | null;
+  createdAt: string;
+}
+
+const ACCOLADE_CATEGORY_TONE: Record<string, "blue" | "green" | "amber" | "red" | "slate"> = {
+  Sports: "green",
+  Technical: "blue",
+  Cultural: "amber",
+  Academic: "blue",
+  Volunteering: "slate",
+  Other: "slate",
+};
+
 function InfoField({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -98,6 +116,7 @@ export default function StudentDetail({ base }: { base: string }) {
   const [proctorOptions, setProctorOptions] = useState<ProctorOption[]>([]);
   const [reassigning, setReassigning] = useState(false);
   const [attendance, setAttendance] = useState<AttendanceSummary | null>(null);
+  const [accolades, setAccolades] = useState<AccoladeItem[] | null>(null);
 
   function loadNotes() {
     if (!usn) return;
@@ -118,6 +137,7 @@ export default function StudentDetail({ base }: { base: string }) {
     loadNotes();
     api.get(`/students/${usn}/analytics/comparison`).then(setComparison);
     api.get(`/students/${usn}/attendance/summary`).then(setAttendance);
+    api.get(`/students/${usn}/accolades`).then(setAccolades);
   }, [usn]);
 
   useEffect(() => {
@@ -190,6 +210,7 @@ export default function StudentDetail({ base }: { base: string }) {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb items={[{ label: "Directory", to: `${base}/directory` }, { label: student.name }]} />
       <Card>
         <div className="flex flex-col gap-4 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
@@ -317,41 +338,63 @@ export default function StudentDetail({ base }: { base: string }) {
                   <h3 className="text-sm font-semibold text-slate-700">Semester {sem}</h3>
                   <Badge tone="blue">SGPA {results?.sgpaBySemester[sem] ?? "N/A"}</Badge>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="text-left text-xs uppercase tracking-wide text-slate-400">
-                      <tr>
-                        <th className="py-1.5 pr-4 font-medium">Subject</th>
-                        <th className="py-1.5 pr-4 font-medium">Grade</th>
-                        <th className="py-1.5 pr-4 font-medium">Marks</th>
-                        <th className="py-1.5 pr-4 font-medium">Status</th>
-                        <th className="py-1.5 pr-4 font-medium">Source</th>
-                        <th className="py-1.5 pr-4 font-medium" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {results?.results
-                        .filter((r) => r.semester === sem)
-                        .map((r) => (
-                          <tr key={r.subjectCode} className="border-t border-slate-50 transition-colors hover:bg-slate-50/70">
-                            <td className="py-2 pr-4 text-slate-700">
-                              {r.subjectCode}
-                              {r.effective.subjectName ? <span className="text-slate-400"> — {r.effective.subjectName}</span> : ""}
-                            </td>
-                            <td className="py-2 pr-4 font-semibold text-slate-800">{r.effective.grade ?? "-"}</td>
-                            <td className="py-2 pr-4 text-slate-600">{r.effective.totalMarks ?? "-"}</td>
-                            <td className="py-2 pr-4">
-                              <Badge tone={r.effective.status === "PASS" ? "green" : "red"} icon={r.effective.status === "PASS" ? CheckCircle2 : XCircle}>
-                                {r.effective.status}
-                              </Badge>
-                            </td>
-                            <td className="py-2 pr-4 text-slate-500">{r.effective.sourceType}</td>
-                            <td className="py-2 pr-4">{r.discrepancy && <Badge tone="amber">discrepancy</Badge>}</td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
+                <ResponsiveTable
+                  table={
+                    <table className="w-full text-sm">
+                      <thead className="text-left text-xs uppercase tracking-wide text-slate-400">
+                        <tr>
+                          <th className="py-1.5 pr-4 font-medium">Subject</th>
+                          <th className="py-1.5 pr-4 font-medium">Grade</th>
+                          <th className="py-1.5 pr-4 font-medium">Marks</th>
+                          <th className="py-1.5 pr-4 font-medium">Status</th>
+                          <th className="py-1.5 pr-4 font-medium">Source</th>
+                          <th className="py-1.5 pr-4 font-medium" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {results?.results
+                          .filter((r) => r.semester === sem)
+                          .map((r) => (
+                            <tr key={r.subjectCode} className="border-t border-slate-50 transition-colors hover:bg-slate-50/70">
+                              <td className="py-2 pr-4 text-slate-700">
+                                {r.subjectCode}
+                                {r.effective.subjectName ? <span className="text-slate-400"> — {r.effective.subjectName}</span> : ""}
+                              </td>
+                              <td className="py-2 pr-4 font-semibold text-slate-800">{r.effective.grade ?? "-"}</td>
+                              <td className="py-2 pr-4 text-slate-600">{r.effective.totalMarks ?? "-"}</td>
+                              <td className="py-2 pr-4">
+                                <Badge tone={r.effective.status === "PASS" ? "green" : "red"} icon={r.effective.status === "PASS" ? CheckCircle2 : XCircle}>
+                                  {r.effective.status}
+                                </Badge>
+                              </td>
+                              <td className="py-2 pr-4 text-slate-500">{r.effective.sourceType}</td>
+                              <td className="py-2 pr-4">{r.discrepancy && <Badge tone="amber">discrepancy</Badge>}</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  }
+                  cards={(results?.results.filter((r) => r.semester === sem) ?? []).map((r) => (
+                    <li key={r.subjectCode} className="py-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-sm text-slate-700">
+                            {r.subjectCode}
+                            {r.effective.subjectName && <div className="text-xs text-slate-400">{r.effective.subjectName}</div>}
+                          </div>
+                        </div>
+                        <span className="shrink-0 text-sm font-semibold text-slate-800">{r.effective.grade ?? "-"}</span>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <Badge tone={r.effective.status === "PASS" ? "green" : "red"} icon={r.effective.status === "PASS" ? CheckCircle2 : XCircle}>
+                          {r.effective.status}
+                        </Badge>
+                        <span className="text-xs text-slate-400">{r.effective.totalMarks ?? "-"} marks · {r.effective.sourceType}</span>
+                        {r.discrepancy && <Badge tone="amber">discrepancy</Badge>}
+                      </div>
+                    </li>
+                  ))}
+                />
               </div>
             ))}
           </div>
@@ -363,28 +406,71 @@ export default function StudentDetail({ base }: { base: string }) {
         {!activity || activity.claims.length === 0 ? (
           <EmptyState message="No claims submitted yet." icon={Award} />
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50/70 text-left text-xs uppercase tracking-wide text-slate-400">
-              <tr>
-                <th className="px-5 py-2.5 font-medium">Description</th>
-                <th className="px-5 py-2.5 font-medium">Requested</th>
-                <th className="px-5 py-2.5 font-medium">Granted</th>
-                <th className="px-5 py-2.5 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {activity.claims.map((c) => (
-                <tr key={c.claimId} className="border-t border-slate-100 transition-colors hover:bg-slate-50/70">
-                  <td className="px-5 py-2.5 text-slate-700">{c.description}</td>
-                  <td className="px-5 py-2.5 text-slate-600">{c.requestedPoints}</td>
-                  <td className="px-5 py-2.5 text-slate-600">{c.grantedPoints ?? "-"}</td>
-                  <td className="px-5 py-2.5">
-                    <Badge tone={c.status === "APPROVED" ? "green" : c.status === "REJECTED" ? "red" : "amber"}>{c.status}</Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <ResponsiveTable
+            table={
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50/70 text-left text-xs uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <th className="px-5 py-2.5 font-medium">Description</th>
+                    <th className="px-5 py-2.5 font-medium">Requested</th>
+                    <th className="px-5 py-2.5 font-medium">Granted</th>
+                    <th className="px-5 py-2.5 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activity.claims.map((c) => (
+                    <tr key={c.claimId} className="border-t border-slate-100 transition-colors hover:bg-slate-50/70">
+                      <td className="px-5 py-2.5 text-slate-700">{c.description}</td>
+                      <td className="px-5 py-2.5 text-slate-600">{c.requestedPoints}</td>
+                      <td className="px-5 py-2.5 text-slate-600">{c.grantedPoints ?? "-"}</td>
+                      <td className="px-5 py-2.5">
+                        <Badge tone={c.status === "APPROVED" ? "green" : c.status === "REJECTED" ? "red" : "amber"}>{c.status}</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            }
+            cards={activity.claims.map((c) => (
+              <li key={c.claimId} className="px-4 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-sm text-slate-700">{c.description}</span>
+                  <Badge tone={c.status === "APPROVED" ? "green" : c.status === "REJECTED" ? "red" : "amber"}>{c.status}</Badge>
+                </div>
+                <div className="mt-1 text-xs text-slate-400">
+                  Requested {c.requestedPoints} · Granted {c.grantedPoints ?? "-"}
+                </div>
+              </li>
+            ))}
+          />
+        )}
+      </Card>
+
+      <Card>
+        <CardHeader title={`Accolades${accolades ? ` (${accolades.length})` : ""}`} subtitle="Standout achievements the student has posted themselves." icon={Sparkles} />
+        {!accolades || accolades.length === 0 ? (
+          <EmptyState message="No accolades posted yet." icon={Sparkles} />
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {accolades.map((a) => (
+              <li key={a.id} className="px-5 py-3.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium text-slate-800">{a.title}</span>
+                  {a.category && <Badge tone={ACCOLADE_CATEGORY_TONE[a.category] ?? "slate"}>{a.category}</Badge>}
+                </div>
+                <p className="mt-1 text-sm text-slate-600">{a.description}</p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                  <span>{new Date(a.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
+                  {a.proofFile && (
+                    <a href={`/api${a.proofFile}`} target="_blank" rel="noreferrer" className="flex items-center gap-1 font-medium text-brand-600 hover:underline">
+                      <Paperclip className="h-3 w-3" />
+                      View proof
+                    </a>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </Card>
 
@@ -417,7 +503,7 @@ export default function StudentDetail({ base }: { base: string }) {
                   </p>
                 </div>
                 {(auth?.role === "ADMIN" || (auth && "facultyId" in auth.profile && auth.profile.facultyId === n.authorId)) && (
-                  <button type="button" onClick={() => deleteNote(n.id)} className="shrink-0 rounded-md p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-600">
+                  <button type="button" onClick={() => deleteNote(n.id)} aria-label="Delete note" className="shrink-0 rounded-md p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-600">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 )}

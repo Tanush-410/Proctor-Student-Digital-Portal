@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Search, Users, GraduationCap, ArrowRight } from "lucide-react";
 import { api } from "../../api/client";
-import { Avatar, Badge, Card, CardHeader, EmptyState, Input, PageSpinner, SkeletonRows } from "../../components/ui";
+import { Avatar, Badge, Card, CardHeader, EmptyState, Input, PageSpinner, SkeletonAvatarRows } from "../../components/ui";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 
 interface FacultyRow {
@@ -68,9 +68,9 @@ export default function Directory({ role }: { role: "ADMIN" | "PROCTOR" }) {
           <Card>
             <CardHeader title="Faculty" icon={GraduationCap} subtitle={searched ? `${faculty.length} match${faculty.length === 1 ? "" : "es"}` : undefined} />
             {loading ? (
-              <SkeletonRows rows={4} />
+              <SkeletonAvatarRows rows={4} />
             ) : faculty.length === 0 ? (
-              <EmptyState message="No faculty matched." />
+              <EmptyState message="No faculty matched." hint="Try a different name, short code, or e-mail." />
             ) : (
               <ul className="divide-y divide-slate-100">
                 {faculty.map((f) => (
@@ -94,9 +94,9 @@ export default function Directory({ role }: { role: "ADMIN" | "PROCTOR" }) {
           <Card>
             <CardHeader title="Students" icon={Users} subtitle={searched ? `${students.length} match${students.length === 1 ? "" : "es"}` : undefined} />
             {loading ? (
-              <SkeletonRows rows={4} />
+              <SkeletonAvatarRows rows={4} />
             ) : students.length === 0 ? (
-              <EmptyState message="No students matched." />
+              <EmptyState message="No students matched." hint="Try a different name or USN." />
             ) : (
               <ul className="divide-y divide-slate-100">
                 {students.map((s) => (

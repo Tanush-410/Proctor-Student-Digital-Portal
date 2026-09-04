@@ -308,6 +308,85 @@ beforeAll(async () => {
       email: "test.att.student2@bmsce.ac.in", // deliberately unassigned — the "not your proctee" skip case
     },
   });
+
+  // Fresh accounts for the Accolades and Activity Points analytics/report tests.
+  const accProctor = await prisma.faculty.create({
+    data: { staffId: "T076", name: "Test Accolade Proctor", shortCode: "TACP", email: "test.acc.proctor@bmsce.ac.in", role: "PROCTOR" },
+  });
+  await prisma.faculty.create({
+    data: { staffId: "T075", name: "Test Accolade Blocked", shortCode: "TACB", email: "test.acc.blocked@bmsce.ac.in", role: "PROCTOR" },
+  });
+  await prisma.faculty.create({
+    data: { staffId: "T074", name: "Test Accolade Admin", shortCode: "TACA", email: "test.acc.admin@bmsce.ac.in", role: "ADMIN" },
+  });
+  await prisma.student.create({
+    data: {
+      usn: "1ACC22CS001",
+      name: "Test Accolade Student One",
+      admissionYear: 2023,
+      currentSemester: 4,
+      proctorId: accProctor.facultyId,
+      email: "test.acc.student1@bmsce.ac.in",
+    },
+  });
+  await prisma.student.create({
+    data: {
+      usn: "1ACC22CS002",
+      name: "Test Accolade Student Two",
+      admissionYear: 2023,
+      currentSemester: 4,
+      email: "test.acc.student2@bmsce.ac.in", // deliberately unassigned
+    },
+  });
+
+  await prisma.faculty.create({
+    data: { staffId: "T073", name: "Test AP Admin", shortCode: "TAPA", email: "test.ap.admin@bmsce.ac.in", role: "ADMIN" },
+  });
+  await prisma.student.create({
+    data: {
+      usn: "1AP22CS001",
+      name: "Test AP Student One",
+      section: "APX",
+      admissionYear: 2023,
+      currentSemester: 4,
+      proctorId: accProctor.facultyId,
+      email: "test.ap.student1@bmsce.ac.in",
+    },
+  });
+  await prisma.student.create({
+    data: {
+      usn: "1AP22CS002",
+      name: "Test AP Student Two",
+      section: "APX",
+      admissionYear: 2023,
+      currentSemester: 4,
+      proctorId: accProctor.facultyId,
+      email: "test.ap.student2@bmsce.ac.in",
+    },
+  });
+  await prisma.student.create({
+    data: {
+      usn: "1AP22CS003",
+      name: "Test AP Student Three",
+      section: "APY",
+      admissionYear: 2023,
+      currentSemester: 4,
+      proctorId: accProctor.facultyId,
+      email: "test.ap.student3@bmsce.ac.in",
+    },
+  });
+  await prisma.activityPointClaim.create({
+    data: { usn: "1AP22CS001", proctorId: accProctor.facultyId, description: "Hackathon win", requestedPoints: 20, grantedPoints: 20, status: "APPROVED", reviewedAt: new Date() },
+  });
+  await prisma.activityPointClaim.create({
+    data: { usn: "1AP22CS002", proctorId: accProctor.facultyId, description: "NSS camp", requestedPoints: 15, grantedPoints: 15, status: "APPROVED", reviewedAt: new Date() },
+  });
+  await prisma.activityPointClaim.create({
+    data: { usn: "1AP22CS002", proctorId: accProctor.facultyId, description: "Still under review", requestedPoints: 5, status: "PENDING" },
+  });
+  await prisma.activityPointClaim.create({
+    data: { usn: "1AP22CS003", proctorId: accProctor.facultyId, description: "State-level chess", requestedPoints: 30, grantedPoints: 30, status: "APPROVED", reviewedAt: new Date() },
+  });
 });
 
 afterAll(async () => {
@@ -963,5 +1042,103 @@ describe("Attendance", () => {
 
     const proctor = await login("test.att.proctor@bmsce.ac.in");
     expect((await proctor.agent.get("/api/admin/attendance/analytics")).status).toBe(403);
+  });
+});
+
+describe("Accolades", () => {
+  let accoladeId: number;
+
+  it("lets a student post their own accolade, notifying their proctor", async () => {
+    const student = await login("test.acc.student1@bmsce.ac.in");
+    const res = await student.agent
+      .post("/api/students/1ACC22CS001/accolades")
+      .field("title", "National-level swimmer")
+      .field("description", "Represented the state at the national swimming championship.")
+      .field("category", "Sports");
+    expect(res.status).toBe(201);
+    expect(res.body.title).toBe("National-level swimmer");
+    accoladeId = res.body.id;
+
+    const proctor = await login("test.acc.proctor@bmsce.ac.in");
+    const notifs = await proctor.agent.get("/api/notifications");
+    expect(notifs.body.items.some((n: any) => n.type === "ACCOLADE_POSTED")).toBe(true);
+  });
+
+  it("blocks a student from posting on someone else's behalf", async () => {
+    const student = await login("test.acc.student2@bmsce.ac.in");
+    const res = await student.agent
+      .post("/api/students/1ACC22CS001/accolades")
+      .field("title", "Impersonation attempt")
+      .field("description", "Should be rejected.");
+    expect(res.status).toBe(403);
+  });
+
+  it("is visible to any Proctor and to the student themselves, not to an unrelated student", async () => {
+    const proctor = await login("test.acc.blocked@bmsce.ac.in"); // any Proctor can read — matches the rest of the student-record access matrix
+    const res = await proctor.agent.get("/api/students/1ACC22CS001/accolades");
+    expect(res.status).toBe(200);
+    expect(res.body.some((a: any) => a.id === accoladeId)).toBe(true);
+
+    const other = await login("test.acc.student2@bmsce.ac.in");
+    expect((await other.agent.get("/api/students/1ACC22CS001/accolades")).status).toBe(403);
+  });
+
+  it("appears in the Proctor's and Admin's accolades feed", async () => {
+    const proctor = await login("test.acc.proctor@bmsce.ac.in");
+    const feed = await proctor.agent.get("/api/accolades");
+    expect(feed.status).toBe(200);
+    expect(feed.body.accolades.some((a: any) => a.id === accoladeId)).toBe(true);
+
+    const admin = await login("test.acc.admin@bmsce.ac.in");
+    const adminFeed = await admin.agent.get("/api/accolades");
+    expect(adminFeed.status).toBe(200);
+    expect(adminFeed.body.accolades.some((a: any) => a.id === accoladeId)).toBe(true);
+  });
+
+  it("does not show up in an unrelated Proctor's feed", async () => {
+    const other = await login("test.acc.blocked@bmsce.ac.in");
+    const feed = await other.agent.get("/api/accolades");
+    expect(feed.status).toBe(200);
+    expect(feed.body.accolades.some((a: any) => a.id === accoladeId)).toBe(false);
+  });
+
+  it("lets the author delete their own accolade, but not another student", async () => {
+    const other = await login("test.acc.student2@bmsce.ac.in");
+    expect((await other.agent.delete(`/api/students/1ACC22CS001/accolades/${accoladeId}`)).status).toBe(403);
+
+    const author = await login("test.acc.student1@bmsce.ac.in");
+    const del = await author.agent.delete(`/api/students/1ACC22CS001/accolades/${accoladeId}`);
+    expect(del.status).toBe(200);
+
+    const check = await author.agent.get("/api/students/1ACC22CS001/accolades");
+    expect(check.body).toHaveLength(0);
+  });
+});
+
+describe("Activity Points analytics + report", () => {
+  it("aggregates approved points by section and builds a leaderboard, admin-only", async () => {
+    const proctor = await login("test.acc.proctor@bmsce.ac.in");
+    expect((await proctor.agent.get("/api/admin/activity-points/analytics")).status).toBe(403);
+
+    const admin = await login("test.ap.admin@bmsce.ac.in");
+    const res = await admin.agent.get("/api/admin/activity-points/analytics");
+    expect(res.status).toBe(200);
+
+    const apx = res.body.bySection.find((s: any) => s.section === "APX");
+    expect(apx).toMatchObject({ totalPoints: 35, studentCount: 2 }); // 20 + 15 approved, 5-point claim still pending
+    const apy = res.body.bySection.find((s: any) => s.section === "APY");
+    expect(apy).toMatchObject({ totalPoints: 30, studentCount: 1 });
+
+    const top = res.body.leaderboard[0];
+    expect(top).toMatchObject({ usn: "1AP22CS003", points: 30 });
+    expect(res.body.leaderboard.some((s: any) => s.usn === "1AP22CS001" && s.points === 20)).toBe(true);
+  });
+
+  it("downloads a PDF report with the same figures", async () => {
+    const admin = await login("test.ap.admin@bmsce.ac.in");
+    const res = await admin.agent.get("/api/admin/activity-points/report");
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toBe("application/pdf");
+    expect(res.body.length).toBeGreaterThan(500); // a real rendered PDF, not an empty stream
   });
 });

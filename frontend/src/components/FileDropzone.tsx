@@ -32,7 +32,7 @@ export function FileDropzone({
           <div className="truncate text-sm font-medium text-slate-800">{file.name}</div>
           <div className="text-xs text-slate-400">{(file.size / 1024).toFixed(1)} KB</div>
         </div>
-        <button type="button" onClick={() => onChange(null)} className="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600">
+        <button type="button" onClick={() => onChange(null)} aria-label="Remove file" className="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600">
           <X className="h-4 w-4" />
         </button>
       </div>

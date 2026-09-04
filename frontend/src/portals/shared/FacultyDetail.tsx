@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { AlertTriangle, Award, Building2, CalendarClock, FileSearch, GraduationCap, History, Mail, Phone, Users, XCircle } from "lucide-react";
 import { api } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
-import { Avatar, Badge, Card, CardHeader, EmptyState, PageSpinner, StatTile } from "../../components/ui";
+import { Avatar, Badge, Breadcrumb, Card, CardHeader, EmptyState, MobileListRow, PageSpinner, ResponsiveTable, StatTile } from "../../components/ui";
 
 interface Faculty {
   facultyId: number;
@@ -112,6 +112,7 @@ export default function FacultyDetail({ base }: { base: string }) {
 
   return (
     <div className="space-y-6">
+      <Breadcrumb items={[base === "/admin" ? { label: "Faculty", to: `${base}/faculty` } : { label: "Directory", to: `${base}/directory` }, { label: faculty.name }]} />
       <Card>
         <div className="flex flex-col gap-4 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
@@ -179,44 +180,56 @@ export default function FacultyDetail({ base }: { base: string }) {
         <Card>
           <CardHeader title={`Proctees (${proctees.length})`} icon={Users} />
           {proctees.length === 0 ? (
-            <EmptyState message="No proctees allocated yet." icon={Users} />
+            <EmptyState message="No proctees allocated yet." hint="The Admin allocates proctees during class-list upload." icon={Users} />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50/70 text-left text-xs uppercase tracking-wide text-slate-400">
-                  <tr>
-                    <th className="px-5 py-2.5 font-medium">Student</th>
-                    <th className="px-5 py-2.5 font-medium">Section</th>
-                    <th className="px-5 py-2.5 font-medium">Semester</th>
-                    <th className="px-5 py-2.5 font-medium" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {proctees.map((s) => (
-                    <tr key={s.usn} className="border-t border-slate-100 transition-colors hover:bg-slate-50/70">
-                      <td className="px-5 py-2.5">
-                        <Link to={`${base}/students/${s.usn}`} className="group flex items-center gap-2.5">
-                          <Avatar name={s.name} size="sm" />
-                          <div>
-                            <div className="font-medium text-slate-800 group-hover:text-brand-700">{s.name}</div>
-                            <div className="font-mono text-[11px] text-slate-400">{s.usn}</div>
-                          </div>
-                        </Link>
-                      </td>
-                      <td className="px-5 py-2.5">
-                        <Badge>{s.section ?? "-"}</Badge>
-                      </td>
-                      <td className="px-5 py-2.5 text-slate-600">{s.currentSemester}</td>
-                      <td className="px-5 py-2.5 text-right">
-                        <Link to={`${base}/students/${s.usn}`} className="text-xs font-medium text-brand-600 hover:underline">
-                          View
-                        </Link>
-                      </td>
+            <ResponsiveTable
+              table={
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50/70 text-left text-xs uppercase tracking-wide text-slate-400">
+                    <tr>
+                      <th className="px-5 py-2.5 font-medium">Student</th>
+                      <th className="px-5 py-2.5 font-medium">Section</th>
+                      <th className="px-5 py-2.5 font-medium">Semester</th>
+                      <th className="px-5 py-2.5 font-medium" />
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {proctees.map((s) => (
+                      <tr key={s.usn} className="border-t border-slate-100 transition-colors hover:bg-slate-50/70">
+                        <td className="px-5 py-2.5">
+                          <Link to={`${base}/students/${s.usn}`} className="group flex items-center gap-2.5">
+                            <Avatar name={s.name} size="sm" />
+                            <div>
+                              <div className="font-medium text-slate-800 group-hover:text-brand-700">{s.name}</div>
+                              <div className="font-mono text-[11px] text-slate-400">{s.usn}</div>
+                            </div>
+                          </Link>
+                        </td>
+                        <td className="px-5 py-2.5">
+                          <Badge>{s.section ?? "-"}</Badge>
+                        </td>
+                        <td className="px-5 py-2.5 text-slate-600">{s.currentSemester}</td>
+                        <td className="px-5 py-2.5 text-right">
+                          <Link to={`${base}/students/${s.usn}`} className="text-xs font-medium text-brand-600 hover:underline">
+                            View
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              }
+              cards={proctees.map((s) => (
+                <MobileListRow
+                  key={s.usn}
+                  to={`${base}/students/${s.usn}`}
+                  leading={<Avatar name={s.name} size="sm" />}
+                  title={s.name}
+                  meta={`${s.usn} · Sem ${s.currentSemester}`}
+                  trailing={<Badge>{s.section ?? "-"}</Badge>}
+                />
+              ))}
+            />
           )}
         </Card>
       )}
@@ -266,46 +279,67 @@ export default function FacultyDetail({ base }: { base: string }) {
       <Card>
         <CardHeader title="Recent Uploads" icon={History} />
         {importBatches.length === 0 ? (
-          <EmptyState message="No uploads yet." icon={GraduationCap} />
+          <EmptyState message="No uploads yet." hint="Uploads from Scan Import or the class-list/results flows show up here." icon={GraduationCap} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50/70 text-left text-xs uppercase tracking-wide text-slate-400">
-                <tr>
-                  <th className="px-5 py-2.5 font-medium">Source</th>
-                  <th className="px-5 py-2.5 font-medium">When</th>
-                  <th className="px-5 py-2.5 font-medium">Rows</th>
-                  <th className="px-5 py-2.5 font-medium">Errors</th>
-                  <th className="px-5 py-2.5 font-medium" />
-                </tr>
-              </thead>
-              <tbody>
-                {importBatches.map((b) => (
-                  <tr key={b.batchId} className="border-t border-slate-100">
-                    <td className="px-5 py-2.5 font-medium text-slate-800">{b.sourceType}</td>
-                    <td className="px-5 py-2.5 text-slate-500">{new Date(b.uploadedAt).toLocaleString()}</td>
-                    <td className="px-5 py-2.5 text-slate-600">{b.rowCount}</td>
-                    <td className="px-5 py-2.5">
-                      <Badge tone={b.errorCount > 0 ? "amber" : "green"}>{b.errorCount}</Badge>
-                    </td>
-                    <td className="px-5 py-2.5 text-right">
-                      {b.sourceFile && (
-                        <a
-                          href={`/api/admin/import-batches/${b.batchId}/source-file`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline"
-                        >
-                          <FileSearch className="h-3.5 w-3.5" />
-                          Source
-                        </a>
-                      )}
-                    </td>
+          <ResponsiveTable
+            table={
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50/70 text-left text-xs uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <th className="px-5 py-2.5 font-medium">Source</th>
+                    <th className="px-5 py-2.5 font-medium">When</th>
+                    <th className="px-5 py-2.5 font-medium">Rows</th>
+                    <th className="px-5 py-2.5 font-medium">Errors</th>
+                    <th className="px-5 py-2.5 font-medium" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {importBatches.map((b) => (
+                    <tr key={b.batchId} className="border-t border-slate-100">
+                      <td className="px-5 py-2.5 font-medium text-slate-800">{b.sourceType}</td>
+                      <td className="px-5 py-2.5 text-slate-500">{new Date(b.uploadedAt).toLocaleString()}</td>
+                      <td className="px-5 py-2.5 text-slate-600">{b.rowCount}</td>
+                      <td className="px-5 py-2.5">
+                        <Badge tone={b.errorCount > 0 ? "amber" : "green"}>{b.errorCount}</Badge>
+                      </td>
+                      <td className="px-5 py-2.5 text-right">
+                        {b.sourceFile && (
+                          <a
+                            href={`/api/admin/import-batches/${b.batchId}/source-file`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:underline"
+                          >
+                            <FileSearch className="h-3.5 w-3.5" />
+                            Source
+                          </a>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            }
+            cards={importBatches.map((b) => (
+              <li key={b.batchId} className="px-4 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-slate-800">{b.sourceType}</span>
+                  <Badge tone={b.errorCount > 0 ? "amber" : "green"}>{b.errorCount} errors</Badge>
+                </div>
+                <div className="mt-1 flex items-center justify-between text-xs text-slate-400">
+                  <span>
+                    {new Date(b.uploadedAt).toLocaleString()} · {b.rowCount} rows
+                  </span>
+                  {b.sourceFile && (
+                    <a href={`/api/admin/import-batches/${b.batchId}/source-file`} target="_blank" rel="noreferrer" className="flex items-center gap-1 font-medium text-brand-600">
+                      <FileSearch className="h-3.5 w-3.5" />
+                      Source
+                    </a>
+                  )}
+                </div>
+              </li>
+            ))}
+          />
         )}
       </Card>
     </div>

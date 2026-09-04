@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Scale, UserX, Users } from "lucide-react";
 import { api } from "../../api/client";
-import { Avatar, Badge, Card, CardHeader, EmptyState, PageSpinner, StatTile } from "../../components/ui";
+import { Avatar, Badge, Card, CardHeader, EmptyState, MobileListRow, PageSpinner, ResponsiveTable, StatTile } from "../../components/ui";
 import { BarChart } from "../../components/charts";
 
 interface ProctorLoad {
@@ -61,37 +61,53 @@ export default function AdminWorkload() {
 
       <Card>
         <CardHeader title="All Proctors" icon={Scale} />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50/70 text-left text-xs uppercase tracking-wide text-slate-400">
-              <tr>
-                <th className="px-5 py-2.5 font-medium">Proctor</th>
-                <th className="px-5 py-2.5 font-medium">Proctees</th>
-                <th className="px-5 py-2.5 font-medium" />
-              </tr>
-            </thead>
-            <tbody>
-              {data.proctors.map((p) => (
-                <tr key={p.facultyId} className="border-t border-slate-100 transition-colors hover:bg-slate-50/70">
-                  <td className="px-5 py-2.5">
-                    <Link to={`/admin/faculty/${p.facultyId}`} className="group flex items-center gap-2.5">
-                      <Avatar name={p.name} size="sm" />
-                      <span className="font-medium text-slate-800 group-hover:text-brand-700">{p.name}</span>
-                    </Link>
-                  </td>
-                  <td className="px-5 py-2.5">
-                    <Badge tone={p.procteeCount > data.avgLoad + 5 ? "amber" : p.procteeCount === 0 ? "slate" : "blue"}>{p.procteeCount}</Badge>
-                  </td>
-                  <td className="px-5 py-2.5 text-right">
-                    <Link to={`/admin/faculty/${p.facultyId}`} className="text-xs font-medium text-brand-600 hover:underline">
-                      View
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {data.proctors.length === 0 ? (
+          <EmptyState message="No proctors yet." icon={Users} />
+        ) : (
+          <ResponsiveTable
+            table={
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50/70 text-left text-xs uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <th className="px-5 py-2.5 font-medium">Proctor</th>
+                    <th className="px-5 py-2.5 font-medium">Proctees</th>
+                    <th className="px-5 py-2.5 font-medium" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.proctors.map((p) => (
+                    <tr key={p.facultyId} className="border-t border-slate-100 transition-colors hover:bg-slate-50/70">
+                      <td className="px-5 py-2.5">
+                        <Link to={`/admin/faculty/${p.facultyId}`} className="group flex items-center gap-2.5">
+                          <Avatar name={p.name} size="sm" />
+                          <span className="font-medium text-slate-800 group-hover:text-brand-700">{p.name}</span>
+                        </Link>
+                      </td>
+                      <td className="px-5 py-2.5">
+                        <Badge tone={p.procteeCount > data.avgLoad + 5 ? "amber" : p.procteeCount === 0 ? "slate" : "blue"}>{p.procteeCount}</Badge>
+                      </td>
+                      <td className="px-5 py-2.5 text-right">
+                        <Link to={`/admin/faculty/${p.facultyId}`} className="text-xs font-medium text-brand-600 hover:underline">
+                          View
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            }
+            cards={data.proctors.map((p) => (
+              <MobileListRow
+                key={p.facultyId}
+                to={`/admin/faculty/${p.facultyId}`}
+                leading={<Avatar name={p.name} size="sm" />}
+                title={p.name}
+                meta={p.shortCode}
+                trailing={<Badge tone={p.procteeCount > data.avgLoad + 5 ? "amber" : p.procteeCount === 0 ? "slate" : "blue"}>{p.procteeCount}</Badge>}
+              />
+            ))}
+          />
+        )}
       </Card>
     </div>
   );

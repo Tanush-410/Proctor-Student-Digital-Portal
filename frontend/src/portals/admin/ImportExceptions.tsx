@@ -52,7 +52,7 @@ export default function ImportExceptions() {
         {exceptions === null ? (
           <SkeletonRows rows={4} />
         ) : exceptions.length === 0 ? (
-          <EmptyState message="No outstanding exceptions." icon={CheckCircle2} />
+          <EmptyState message="No outstanding exceptions." hint="Every row from every import matched a known student." icon={CheckCircle2} />
         ) : (
           <ul className="divide-y divide-slate-100">
             {exceptions.map((ex) => (

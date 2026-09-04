@@ -68,7 +68,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   <p className="text-sm font-semibold text-slate-900">{t.title}</p>
                   {t.description && <p className="mt-0.5 text-sm text-slate-500">{t.description}</p>}
                 </div>
-                <button onClick={() => dismiss(t.id)} className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+                <button onClick={() => dismiss(t.id)} aria-label="Dismiss notification" className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
                   <X className="h-4 w-4" />
                 </button>
               </div>

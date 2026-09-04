@@ -39,6 +39,17 @@ const GRADE_ORDER: { g: string; c: string }[] = [
 
 type Doc = PDFKit.PDFDocument;
 
+/** Large, faint, rotated crest behind the page content — every page, including any added later, via PDFKit's `pageAdded` event. */
+function drawWatermark(doc: Doc) {
+  if (!fs.existsSync(LOGO_PATH)) return;
+  const size = Math.min(doc.page.width, doc.page.height) * 0.85;
+  doc.save();
+  doc.opacity(0.045);
+  doc.rotate(-25, { origin: [doc.page.width / 2, doc.page.height / 2] });
+  doc.image(LOGO_PATH, doc.page.width / 2 - size / 2, doc.page.height / 2 - size / 2, { width: size, height: size });
+  doc.restore();
+}
+
 /** ReportGenerationService.buildParentSummary — streams a PDF built from the effective-results view. */
 export function buildParentSummaryPdf(data: ParentSummaryData, res: Response) {
   const doc = new PDFDocument({ margin: 50 });
@@ -46,9 +57,12 @@ export function buildParentSummaryPdf(data: ParentSummaryData, res: Response) {
   res.setHeader("Content-Disposition", `inline; filename="${data.student.usn}-parent-summary.pdf"`);
   doc.pipe(res);
 
+  drawWatermark(doc);
+  doc.on("pageAdded", () => drawWatermark(doc));
+
   if (fs.existsSync(LOGO_PATH)) {
-    doc.image(LOGO_PATH, doc.page.width / 2 - 22, doc.y, { width: 44, height: 44 });
-    doc.moveDown(3.2);
+    doc.image(LOGO_PATH, doc.page.width / 2 - 32, doc.y, { width: 64, height: 64 });
+    doc.moveDown(4.6);
   }
   doc.fontSize(18).text("Parent Summary Report", { align: "center" });
   doc.moveDown(0.5);
@@ -118,6 +132,111 @@ export function buildParentSummaryPdf(data: ParentSummaryData, res: Response) {
 
   doc.moveDown(2);
   doc.fontSize(8).fillColor("gray").text(`Generated ${new Date().toLocaleString()}`, { align: "right" });
+
+  doc.end();
+}
+
+export interface ActivityPointsReportData {
+  totalStudents: number;
+  totalClaims: number;
+  pendingCount: number;
+  approvedCount: number;
+  rejectedCount: number;
+  totalApprovedPoints: number;
+  bySection: { section: string; totalPoints: number; studentCount: number }[];
+  leaderboard: { usn: string; name: string; section: string | null; points: number }[];
+}
+
+/** ReportGenerationService.buildActivityPointsReport — department-wide Activity Points summary for the HOD: section totals, a leaderboard, and the review-queue breakdown. */
+export function buildActivityPointsReportPdf(data: ActivityPointsReportData, res: Response) {
+  const doc = new PDFDocument({ margin: 50 });
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="activity-points-report.pdf"`);
+  doc.pipe(res);
+
+  drawWatermark(doc);
+  doc.on("pageAdded", () => drawWatermark(doc));
+
+  if (fs.existsSync(LOGO_PATH)) {
+    doc.image(LOGO_PATH, doc.page.width / 2 - 32, doc.y, { width: 64, height: 64 });
+    doc.moveDown(4.6);
+  }
+  doc.fontSize(18).text("Activity Points Report", { align: "center" });
+  doc.moveDown(0.5);
+  doc.fontSize(10).fillColor("gray").text("BMS College of Engineering — Department-wide Summary", { align: "center" });
+  doc.fillColor("black");
+  doc.moveDown(1.5);
+
+  doc.fontSize(13).text("Overview");
+  doc.moveDown(0.3);
+  doc.fontSize(10);
+  doc.text(`Students: ${data.totalStudents}`);
+  doc.text(`Total Claims Submitted: ${data.totalClaims}  (Pending ${data.pendingCount}, Approved ${data.approvedCount}, Rejected ${data.rejectedCount})`);
+  doc.text(`Total Approved Points Awarded: ${data.totalApprovedPoints}`);
+  doc.moveDown(1);
+
+  doc.fontSize(13).text("By Section");
+  doc.moveDown(0.3);
+  doc.fontSize(9);
+  if (data.bySection.length === 0) {
+    doc.fillColor("gray").text("No students recorded yet.").fillColor("black");
+  } else {
+    for (const s of data.bySection) {
+      doc.text(`  ${s.section}: ${s.totalPoints} points across ${s.studentCount} student(s)`);
+    }
+  }
+  doc.moveDown(1);
+
+  // ---- Section chart + leaderboard, on their own page ----
+  doc.addPage();
+  doc.fontSize(15).fillColor("black").text("Section Totals & Leaderboard", { align: "center" });
+  doc.moveDown(1);
+
+  const left = doc.page.margins.left;
+  const usableW = doc.page.width - left - doc.page.margins.right;
+  const top = doc.y;
+
+  drawPanel(doc, left, top, usableW, 200, "Approved Points by Section", (x, y, w, h) => {
+    if (data.bySection.length === 0) return emptyNote(doc, x, y, w, h);
+    barChart(
+      doc, x, y, w, h,
+      data.bySection.map((s) => ({ label: s.section, value: s.totalPoints, color: "#00519c" })),
+      Math.max(1, ...data.bySection.map((s) => s.totalPoints))
+    );
+  });
+
+  let listY = top + 200 + 30;
+  doc.fontSize(12).fillColor("black").text("Leaderboard", left, listY);
+  listY += 22;
+  if (data.leaderboard.length === 0) {
+    doc.fontSize(9).fillColor("gray").text("No approved claims yet.", left, listY);
+  } else {
+    doc.fontSize(8).fillColor("#64748b");
+    doc.text("Rank", left, listY, { width: 40 });
+    doc.text("Student", left + 40, listY, { width: 260 });
+    doc.text("Section", left + 300, listY, { width: 80 });
+    doc.text("Points", left + 380, listY, { width: 80, align: "right" });
+    listY += 14;
+    doc.moveTo(left, listY).lineTo(left + usableW, listY).strokeColor("#e2e8f0").lineWidth(0.5).stroke();
+    listY += 6;
+    data.leaderboard.forEach((s, i) => {
+      if (listY > doc.page.height - doc.page.margins.bottom - 20) {
+        doc.addPage();
+        listY = doc.page.margins.top;
+      }
+      const topThree = i < 3;
+      doc.fontSize(9).fillColor(topThree ? "#00519c" : "#1e293b");
+      doc.text(`#${i + 1}`, left, listY, { width: 40 });
+      doc.text(`${s.name} (${s.usn})`, left + 40, listY, { width: 260 });
+      doc.text(s.section ?? "-", left + 300, listY, { width: 80 });
+      doc.text(String(s.points), left + 380, listY, { width: 80, align: "right" });
+      listY += 16;
+    });
+    doc.fillColor("black");
+  }
+
+  doc.moveDown(2);
+  doc.fontSize(8).fillColor("gray").text(`Generated ${new Date().toLocaleString()}`, left, doc.page.height - doc.page.margins.bottom - 20, { align: "right", width: usableW });
 
   doc.end();
 }

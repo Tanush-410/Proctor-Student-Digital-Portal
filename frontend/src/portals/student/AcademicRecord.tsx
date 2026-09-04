@@ -3,7 +3,7 @@ import { CheckCircle2, FilePlus2, GraduationCap, XCircle } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { api, ApiError } from "../../api/client";
 import { useToast } from "../../components/Toast";
-import { Badge, Button, Card, CardHeader, EmptyState, Input, Label, PageSpinner, StatTile } from "../../components/ui";
+import { Badge, Button, Card, CardHeader, EmptyState, Input, Label, PageSpinner, ResponsiveTable, StatTile } from "../../components/ui";
 
 interface EffectiveRow {
   subjectCode: string;
@@ -66,39 +66,63 @@ export default function AcademicRecord() {
                       <h3 className="text-sm font-semibold text-slate-700">Semester {sem}</h3>
                       <Badge tone="blue">SGPA {results.sgpaBySemester[sem] ?? "N/A"}</Badge>
                     </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead className="text-left text-xs uppercase tracking-wide text-slate-400">
-                          <tr>
-                            <th className="py-1.5 pr-4 font-medium">Subject</th>
-                            <th className="py-1.5 pr-4 font-medium">Grade</th>
-                            <th className="py-1.5 pr-4 font-medium">Marks</th>
-                            <th className="py-1.5 pr-4 font-medium">Status</th>
-                            <th className="py-1.5 pr-4 font-medium" />
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {results.results
-                            .filter((r) => r.semester === sem)
-                            .map((r) => (
-                              <tr key={r.subjectCode} className="border-t border-slate-50 transition-colors hover:bg-slate-50/70">
-                                <td className="py-2 pr-4 text-slate-700">
+                    <ResponsiveTable
+                      table={
+                        <table className="w-full text-sm">
+                          <thead className="text-left text-xs uppercase tracking-wide text-slate-400">
+                            <tr>
+                              <th className="py-1.5 pr-4 font-medium">Subject</th>
+                              <th className="py-1.5 pr-4 font-medium">Grade</th>
+                              <th className="py-1.5 pr-4 font-medium">Marks</th>
+                              <th className="py-1.5 pr-4 font-medium">Status</th>
+                              <th className="py-1.5 pr-4 font-medium" />
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {results.results
+                              .filter((r) => r.semester === sem)
+                              .map((r) => (
+                                <tr key={r.subjectCode} className="border-t border-slate-50 transition-colors hover:bg-slate-50/70">
+                                  <td className="py-2 pr-4 text-slate-700">
+                                    {r.subjectCode}
+                                    {r.effective.subjectName ? <span className="text-slate-400"> — {r.effective.subjectName}</span> : ""}
+                                  </td>
+                                  <td className="py-2 pr-4 font-semibold text-slate-800">{r.effective.grade ?? "-"}</td>
+                                  <td className="py-2 pr-4 text-slate-600">{r.effective.totalMarks ?? "-"}</td>
+                                  <td className="py-2 pr-4">
+                                    <Badge tone={r.effective.status === "PASS" ? "green" : "red"} icon={r.effective.status === "PASS" ? CheckCircle2 : XCircle}>
+                                      {r.effective.status}
+                                    </Badge>
+                                  </td>
+                                  <td className="py-2 pr-4">{r.discrepancy && <Badge tone="amber">recheck: differs from your entry</Badge>}</td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      }
+                      cards={results.results
+                        .filter((r) => r.semester === sem)
+                        .map((r) => (
+                          <li key={r.subjectCode} className="py-2.5">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="text-sm text-slate-700">
                                   {r.subjectCode}
-                                  {r.effective.subjectName ? <span className="text-slate-400"> — {r.effective.subjectName}</span> : ""}
-                                </td>
-                                <td className="py-2 pr-4 font-semibold text-slate-800">{r.effective.grade ?? "-"}</td>
-                                <td className="py-2 pr-4 text-slate-600">{r.effective.totalMarks ?? "-"}</td>
-                                <td className="py-2 pr-4">
-                                  <Badge tone={r.effective.status === "PASS" ? "green" : "red"} icon={r.effective.status === "PASS" ? CheckCircle2 : XCircle}>
-                                    {r.effective.status}
-                                  </Badge>
-                                </td>
-                                <td className="py-2 pr-4">{r.discrepancy && <Badge tone="amber">recheck: differs from your entry</Badge>}</td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    </div>
+                                  {r.effective.subjectName && <div className="text-xs text-slate-400">{r.effective.subjectName}</div>}
+                                </div>
+                              </div>
+                              <span className="shrink-0 text-sm font-semibold text-slate-800">{r.effective.grade ?? "-"}</span>
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                              <Badge tone={r.effective.status === "PASS" ? "green" : "red"} icon={r.effective.status === "PASS" ? CheckCircle2 : XCircle}>
+                                {r.effective.status}
+                              </Badge>
+                              <span className="text-xs text-slate-400">{r.effective.totalMarks ?? "-"} marks</span>
+                              {r.discrepancy && <Badge tone="amber">recheck: differs from your entry</Badge>}
+                            </div>
+                          </li>
+                        ))}
+                    />
                   </div>
                 ))}
               </div>

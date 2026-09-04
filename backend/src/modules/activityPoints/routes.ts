@@ -182,3 +182,64 @@ activityPointsRouter.patch("/activity-points/claims/:id/review", requireAuth, re
   logAudit(req, decision === "APPROVED" ? "APPROVE" : "REJECT", "ActivityPointClaim", String(id), { usn: claim.usn, grantedPoints });
   res.json({ claim: updated, runningTotal: await computeRunningTotal(claim.usn) });
 });
+
+/** Shared aggregation for the analytics endpoint and the PDF report — total
+ * approved points per student, rolled up by section, plus a leaderboard.
+ * Only APPROVED claims count (a pending/rejected claim isn't "claimed" yet
+ * in the sense a section total or leaderboard should reflect). */
+export async function computeActivityPointsAnalytics() {
+  const [students, claims] = await Promise.all([
+    prisma.student.findMany({ select: { usn: true, name: true, section: true } }),
+    prisma.activityPointClaim.findMany({ select: { usn: true, status: true, requestedPoints: true, grantedPoints: true } }),
+  ]);
+
+  const approvedByUsn = new Map<string, number>();
+  let totalApprovedPoints = 0;
+  let pendingCount = 0;
+  let approvedCount = 0;
+  let rejectedCount = 0;
+  for (const c of claims) {
+    if (c.status === "PENDING") pendingCount++;
+    else if (c.status === "APPROVED") {
+      approvedCount++;
+      const pts = c.grantedPoints ?? 0;
+      totalApprovedPoints += pts;
+      approvedByUsn.set(c.usn, (approvedByUsn.get(c.usn) ?? 0) + pts);
+    } else if (c.status === "REJECTED") rejectedCount++;
+  }
+
+  const bySectionMap = new Map<string, { points: number; students: number }>();
+  for (const s of students) {
+    const key = s.section ?? "Unassigned";
+    const bucket = bySectionMap.get(key) ?? { points: 0, students: 0 };
+    bucket.points += approvedByUsn.get(s.usn) ?? 0;
+    bucket.students += 1;
+    bySectionMap.set(key, bucket);
+  }
+  const bySection = [...bySectionMap.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([section, b]) => ({ section, totalPoints: b.points, studentCount: b.students }));
+
+  const leaderboard = students
+    .map((s) => ({ usn: s.usn, name: s.name, section: s.section, points: approvedByUsn.get(s.usn) ?? 0 }))
+    .filter((s) => s.points > 0)
+    .sort((a, b) => b.points - a.points)
+    .slice(0, 15);
+
+  return {
+    totalStudents: students.length,
+    totalClaims: claims.length,
+    pendingCount,
+    approvedCount,
+    rejectedCount,
+    totalApprovedPoints,
+    bySection,
+    leaderboard,
+  };
+}
+
+// GET /admin/activity-points/analytics — section totals + leaderboard, for
+// the HOD's Activity Points tab.
+activityPointsRouter.get("/admin/activity-points/analytics", requireAuth, requireRole("ADMIN"), async (_req: AuthedRequest, res) => {
+  res.json(await computeActivityPointsAnalytics());
+});

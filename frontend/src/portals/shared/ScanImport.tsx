@@ -187,7 +187,13 @@ export default function ScanImport({ base: _base }: { base: string }) {
                         onChange={(e) => updateSubject(i, { credits: parseInt(e.target.value, 10) || 0 })}
                         className="w-20"
                       />
-                      <button type="button" onClick={() => removeSubject(i)} disabled={subjects.length === 1} className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30">
+                      <button
+                        type="button"
+                        onClick={() => removeSubject(i)}
+                        disabled={subjects.length === 1}
+                        aria-label={`Remove subject ${i + 1}`}
+                        className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
+                      >
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>

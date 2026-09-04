@@ -1,4 +1,5 @@
 import { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { LucideIcon } from "lucide-react";
 
 export function Card({ children, className = "", ...rest }: HTMLAttributes<HTMLDivElement>) {
@@ -78,15 +79,29 @@ export function Badge({ tone = "slate", icon: Icon, children }: { tone?: "slate"
   );
 }
 
-export function EmptyState({ message, icon: Icon }: { message: string; icon?: LucideIcon }) {
+export function EmptyState({
+  message,
+  hint,
+  icon: Icon,
+  action,
+}: {
+  message: string;
+  hint?: string;
+  icon?: LucideIcon;
+  action?: ReactNode;
+}) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 px-5 py-14 text-center">
+    <div className="flex flex-col items-center justify-center gap-3 px-5 py-14 text-center">
       {Icon && (
-        <div className="mb-1 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-          <Icon className="h-5 w-5" />
+        <div className="mb-1 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 text-slate-400 ring-1 ring-slate-200/60">
+          <Icon className="h-6 w-6" />
         </div>
       )}
-      <p className="text-sm text-slate-400">{message}</p>
+      <div className="space-y-1">
+        <p className="text-sm font-medium text-slate-600">{message}</p>
+        {hint && <p className="mx-auto max-w-xs text-xs text-slate-400">{hint}</p>}
+      </div>
+      {action && <div className="mt-1">{action}</div>}
     </div>
   );
 }
@@ -104,16 +119,36 @@ export function PageSpinner() {
 }
 
 export function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`skeleton rounded-md ${className}`} />;
+  return <div className={`skeleton rounded-md ${className}`} aria-hidden="true" />;
 }
 
 export function SkeletonRows({ rows = 4 }: { rows?: number }) {
   return (
-    <div className="space-y-3 px-5 py-4">
+    <div className="space-y-3 px-5 py-4" role="status" aria-label="Loading">
       {Array.from({ length: rows }).map((_, i) => (
         <Skeleton key={i} className="h-5 w-full" />
       ))}
     </div>
+  );
+}
+
+/** A row shaped like the avatar+name+meta+badge rows this app's tables and
+ * card lists actually use, so a loading list reads as "this specific list is
+ * loading" rather than a handful of generic bars. */
+export function SkeletonAvatarRows({ rows = 4 }: { rows?: number }) {
+  return (
+    <ul className="divide-y divide-slate-100" role="status" aria-label="Loading">
+      {Array.from({ length: rows }).map((_, i) => (
+        <li key={i} className="flex items-center gap-3 px-5 py-3.5">
+          <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
+          <div className="flex-1 space-y-1.5">
+            <Skeleton className="h-3.5 w-1/3" />
+            <Skeleton className="h-3 w-1/4" />
+          </div>
+          <Skeleton className="h-5 w-14 shrink-0 rounded-full" />
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -144,8 +179,45 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   );
 }
 
-export function Label({ children }: { children: ReactNode }) {
-  return <label className="mb-1.5 block text-xs font-medium text-slate-600">{children}</label>;
+export function Label({ children, htmlFor }: { children: ReactNode; htmlFor?: string }) {
+  return (
+    <label htmlFor={htmlFor} className="mb-1.5 block text-xs font-medium text-slate-600">
+      {children}
+    </label>
+  );
+}
+
+/**
+ * A button with no visible text — every one of these MUST get a real
+ * `label` (rendered as aria-label + title), since an icon alone tells a
+ * screen reader nothing. Carries the same focus ring / hover treatment as
+ * every other interactive control in the app.
+ */
+export function IconButton({
+  icon: Icon,
+  label,
+  tone = "default",
+  size = "md",
+  className = "",
+  ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  icon: LucideIcon;
+  label: string;
+  tone?: "default" | "danger";
+  size?: "sm" | "md";
+}) {
+  const toneStyles = tone === "danger" ? "text-slate-400 hover:bg-red-50 hover:text-red-600" : "text-slate-400 hover:bg-slate-100 hover:text-slate-700";
+  const sizeStyles = size === "sm" ? "p-1.5" : "p-2";
+  return (
+    <button
+      aria-label={label}
+      title={label}
+      className={`inline-flex shrink-0 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 ${toneStyles} ${sizeStyles} ${className}`}
+      {...rest}
+    >
+      <Icon className={size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4"} />
+    </button>
+  );
 }
 
 const STAT_TONE: Record<string, { text: string; iconBg: string; iconText: string; accent: string }> = {
@@ -214,4 +286,78 @@ export function Avatar({ name, size = "md" }: { name: string; size?: "sm" | "md"
 
 export function Divider({ className = "" }: { className?: string }) {
   return <div className={`h-px bg-slate-100 ${className}`} />;
+}
+
+/**
+ * Renders `table` as a real <table> on md+ screens and as a stacked list of
+ * cards below that — a wide multi-column table has no good way to shrink
+ * that isn't either a horizontal-scroll strip (works, but is genuinely bad
+ * on a phone) or a restructured layout, so this owns the breakpoint switch
+ * once instead of every page duplicating a `hidden md:block` / `md:hidden`
+ * pair. `table` is the full desktop `<table>…</table>` element; `cards` is
+ * the same rows re-rendered as `<MobileListRow>` children.
+ */
+export function ResponsiveTable({ table, cards }: { table: ReactNode; cards: ReactNode }) {
+  return (
+    <>
+      <div className="hidden overflow-x-auto md:block">{table}</div>
+      <ul className="divide-y divide-slate-100 md:hidden">{cards}</ul>
+    </>
+  );
+}
+
+/** One row of a ResponsiveTable's mobile card list — leading visual, a title
+ * + one or two meta lines, and trailing content (a badge, a value, an
+ * action). Matches the row shape already used by Directory's search results. */
+export function MobileListRow({ to, leading, title, meta, trailing }: { to?: string; leading?: ReactNode; title: ReactNode; meta?: ReactNode; trailing?: ReactNode }) {
+  const content = (
+    <div className="flex items-center gap-3 px-4 py-3">
+      {leading}
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium text-slate-800">{title}</div>
+        {meta && <div className="mt-0.5 truncate text-xs text-slate-400">{meta}</div>}
+      </div>
+      {trailing && <div className="shrink-0">{trailing}</div>}
+    </div>
+  );
+  return <li>{to ? <Link to={to} className="block transition-colors hover:bg-slate-50">{content}</Link> : content}</li>;
+}
+
+/** Mobile card for a ResponsiveTable whose rows are aggregate stats (a
+ * section/semester breakdown) rather than an entity — a title plus a small
+ * grid of labelled numbers, instead of the avatar+meta shape MobileListRow
+ * is for. */
+export function StatRowCard({ title, stats }: { title: ReactNode; stats: { label: string; value: ReactNode }[] }) {
+  return (
+    <li className="px-4 py-3.5">
+      <div className="mb-2 text-sm font-semibold text-slate-800">{title}</div>
+      <div className="grid grid-cols-4 gap-2">
+        {stats.map((s, i) => (
+          <div key={i}>
+            <div className="text-[10px] uppercase tracking-wide text-slate-400">{s.label}</div>
+            <div className="text-sm font-medium text-slate-700">{s.value}</div>
+          </div>
+        ))}
+      </div>
+    </li>
+  );
+}
+
+export function Breadcrumb({ items }: { items: { label: string; to?: string }[] }) {
+  return (
+    <nav className="mb-1 flex items-center gap-1.5 text-sm text-slate-400">
+      {items.map((item, i) => (
+        <span key={i} className="flex items-center gap-1.5">
+          {i > 0 && <span className="text-slate-300">/</span>}
+          {item.to ? (
+            <Link to={item.to} className="text-slate-500 transition-colors hover:text-brand-600">
+              {item.label}
+            </Link>
+          ) : (
+            <span className="text-slate-700">{item.label}</span>
+          )}
+        </span>
+      ))}
+    </nav>
+  );
 }

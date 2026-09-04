@@ -46,6 +46,28 @@ model Faculty {
   @@map("faculty")
 }
 
+// A student-submitted, non-point-bearing record of a standout achievement
+// ("national-level swimmer", a hackathon win, a published paper) — distinct
+// from ActivityPointClaim, which is specifically the AICTE point-tally
+// mechanism with a requested/granted point value and an approval workflow.
+// Accolades have neither: there is nothing to approve, only something to
+// showcase, so the only lifecycle is "the student posted it" / "it's
+// visible to their proctor and the HOD" / "it can be removed" — no status field.
+model Accolade {
+  id          Int      @id @default(autoincrement())
+  usn         String
+  title       String
+  description String
+  category    String? // free-form label the student picks: Sports, Technical, Cultural, Academic, Other
+  proofFile   String?  @map("proof_file")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  student Student @relation(fields: [usn], references: [usn])
+
+  @@index([usn])
+  @@map("accolade")
+}
+
 model Student {
   usn               String   @id
   name               String
@@ -69,6 +91,7 @@ model Student {
   ptmRecords PtmRecord[]
   notes      StudentNote[]
   attendance AttendanceRecord[]
+  accolades  Accolade[]
 
   @@map("student")
 }

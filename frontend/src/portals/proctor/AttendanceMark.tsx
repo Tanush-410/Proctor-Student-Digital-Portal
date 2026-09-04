@@ -149,6 +149,8 @@ export default function AttendanceMark() {
                             key={st}
                             type="button"
                             onClick={() => setStatus(s.usn, st)}
+                            aria-pressed={active}
+                            aria-label={`Mark ${s.name} ${st.toLowerCase()}`}
                             className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
                               active
                                 ? tone === "green"
