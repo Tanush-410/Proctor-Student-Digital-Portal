@@ -5,7 +5,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { api, ApiError } from "../../api/client";
 import { useToast } from "../../components/Toast";
 import { Modal } from "../../components/Modal";
-import { Avatar, Badge, Button, Card, CardHeader, EmptyState, Input, Label, SkeletonRows, StatTile, Textarea } from "../../components/ui";
+import { Avatar, Badge, Button, Card, CardHeader, EmptyState, Input, Label, ResponsiveTable, SkeletonAvatarRows, StatTile, Textarea } from "../../components/ui";
 import { DashboardHero } from "../../components/DashboardHero";
 
 interface StudentRow {
@@ -207,54 +207,93 @@ export default function ProctorDashboard() {
           }
         />
         {students === null ? (
-          <SkeletonRows rows={6} />
+          <SkeletonAvatarRows rows={6} />
         ) : filtered.length === 0 ? (
-          <EmptyState message={students.length === 0 ? "No proctees allocated yet — check the Admin's Upload/Exceptions flow." : "No proctees matched."} icon={Users} />
+          <EmptyState
+            message={students.length === 0 ? "No proctees allocated yet." : "No proctees matched."}
+            hint={students.length === 0 ? "The Admin allocates proctees during class-list upload — check the Exceptions queue if someone's missing." : undefined}
+            icon={Users}
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50/70 text-left text-xs uppercase tracking-wide text-slate-400">
-                <tr>
-                  <th className="w-10 px-5 py-2.5">
-                    <input type="checkbox" checked={selected.size > 0 && selected.size === filtered.length} onChange={toggleAll} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500/40" />
-                  </th>
-                  <th className="px-5 py-2.5 font-medium">Student</th>
-                  <th className="px-5 py-2.5 font-medium">Section</th>
-                  <th className="px-5 py-2.5 font-medium">Semester</th>
-                  <th className="px-5 py-2.5 font-medium" />
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((s) => (
-                  <tr key={s.usn} className={`border-t border-slate-100 transition-colors hover:bg-slate-50/70 ${selected.has(s.usn) ? "bg-brand-50/40" : ""}`}>
-                    <td className="px-5 py-2.5">
-                      <input type="checkbox" checked={selected.has(s.usn)} onChange={() => toggle(s.usn)} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500/40" />
-                    </td>
-                    <td className="px-5 py-2.5">
-                      <Link to={`/proctor/students/${s.usn}`} className="flex items-center gap-2.5 group">
-                        <Avatar name={s.name} size="sm" />
-                        <div>
-                          <div className="font-medium text-slate-800 group-hover:text-brand-700">{s.name}</div>
-                          <div className="font-mono text-[11px] text-slate-400">{s.usn}</div>
-                        </div>
-                      </Link>
-                    </td>
-                    <td className="px-5 py-2.5">
-                      <Badge>{s.section ?? "-"}</Badge>
-                    </td>
-                    <td className="px-5 py-2.5 text-slate-600">{s.currentSemester}</td>
-                    <td className="px-5 py-2.5 text-right">
-                      <Link to={`/proctor/students/${s.usn}`}>
-                        <Button variant="secondary" size="sm">
-                          View
-                        </Button>
-                      </Link>
-                    </td>
+          <ResponsiveTable
+            table={
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50/70 text-left text-xs uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <th className="w-10 px-5 py-2.5">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all proctees"
+                        checked={selected.size > 0 && selected.size === filtered.length}
+                        onChange={toggleAll}
+                        className="rounded border-slate-300 text-brand-600 focus:ring-brand-500/40"
+                      />
+                    </th>
+                    <th className="px-5 py-2.5 font-medium">Student</th>
+                    <th className="px-5 py-2.5 font-medium">Section</th>
+                    <th className="px-5 py-2.5 font-medium">Semester</th>
+                    <th className="px-5 py-2.5 font-medium" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filtered.map((s) => (
+                    <tr key={s.usn} className={`border-t border-slate-100 transition-colors hover:bg-slate-50/70 ${selected.has(s.usn) ? "bg-brand-50/40" : ""}`}>
+                      <td className="px-5 py-2.5">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${s.name}`}
+                          checked={selected.has(s.usn)}
+                          onChange={() => toggle(s.usn)}
+                          className="rounded border-slate-300 text-brand-600 focus:ring-brand-500/40"
+                        />
+                      </td>
+                      <td className="px-5 py-2.5">
+                        <Link to={`/proctor/students/${s.usn}`} className="flex items-center gap-2.5 group">
+                          <Avatar name={s.name} size="sm" />
+                          <div>
+                            <div className="font-medium text-slate-800 group-hover:text-brand-700">{s.name}</div>
+                            <div className="font-mono text-[11px] text-slate-400">{s.usn}</div>
+                          </div>
+                        </Link>
+                      </td>
+                      <td className="px-5 py-2.5">
+                        <Badge>{s.section ?? "-"}</Badge>
+                      </td>
+                      <td className="px-5 py-2.5 text-slate-600">{s.currentSemester}</td>
+                      <td className="px-5 py-2.5 text-right">
+                        <Link to={`/proctor/students/${s.usn}`}>
+                          <Button variant="secondary" size="sm">
+                            View
+                          </Button>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            }
+            cards={filtered.map((s) => (
+              <li key={s.usn} className="flex items-center gap-3 px-4 py-3">
+                <input
+                  type="checkbox"
+                  aria-label={`Select ${s.name}`}
+                  checked={selected.has(s.usn)}
+                  onChange={() => toggle(s.usn)}
+                  className="shrink-0 rounded border-slate-300 text-brand-600 focus:ring-brand-500/40"
+                />
+                <Link to={`/proctor/students/${s.usn}`} className="flex min-w-0 flex-1 items-center gap-3">
+                  <Avatar name={s.name} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-slate-800">{s.name}</div>
+                    <div className="truncate text-xs text-slate-400">
+                      {s.usn} · Sem {s.currentSemester}
+                    </div>
+                  </div>
+                  <Badge>{s.section ?? "-"}</Badge>
+                </Link>
+              </li>
+            ))}
+          />
         )}
       </Card>
 

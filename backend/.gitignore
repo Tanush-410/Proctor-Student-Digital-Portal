@@ -10,5 +10,7 @@ uploads/imports/*
 !uploads/imports/.gitkeep
 uploads/scans/*
 !uploads/scans/.gitkeep
+uploads/accolades/*
+!uploads/accolades/.gitkeep
 .env
 *.traineddata

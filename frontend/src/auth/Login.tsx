@@ -52,12 +52,13 @@ export default function Login() {
         <div className="pointer-events-none absolute inset-0 bg-[length:28px_28px] bg-[radial-gradient(circle_at_1px_1px,white_1px,transparent_0)] opacity-[0.15]" />
         <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-brand-400/30 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-32 -left-16 h-96 w-96 rounded-full bg-brand-900/40 blur-3xl" />
+        <img src="/bms-logo.svg" alt="" aria-hidden="true" className="pointer-events-none absolute -bottom-24 -right-24 h-[32rem] w-[32rem] opacity-[0.15]" />
 
-        <div className="relative flex items-center gap-2.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white p-1.5 shadow-soft">
+        <div className="relative flex items-center gap-3">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white p-2 shadow-soft">
             <img src="/bms-logo.svg" alt="BMSCE" className="h-full w-full" />
           </div>
-          <span className="text-lg font-semibold text-white">Proctor Diary</span>
+          <span className="text-xl font-semibold text-white">Proctor Diary</span>
         </div>
 
         <div className="relative max-w-md">
@@ -82,10 +83,16 @@ export default function Login() {
       </div>
 
       {/* Form panel */}
-      <div className="flex items-center justify-center bg-slate-50 px-4 py-12">
-        <div className="w-full max-w-sm">
+      <div className="relative flex items-center justify-center overflow-hidden bg-slate-50 px-4 py-12">
+        <img
+          src="/bms-logo.svg"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute -bottom-16 -left-16 h-80 w-80 opacity-[0.05] lg:h-96 lg:w-96"
+        />
+        <div className="relative w-full max-w-sm">
           <div className="mb-8 text-center lg:hidden">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-white p-2 shadow-soft ring-1 ring-slate-200/80">
+            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-white p-2.5 shadow-soft ring-1 ring-slate-200/80">
               <img src="/bms-logo.svg" alt="BMSCE" className="h-full w-full" />
             </div>
             <h1 className="text-xl font-semibold text-slate-900">Proctor Diary</h1>

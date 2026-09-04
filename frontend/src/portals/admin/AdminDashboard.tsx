@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { AlertTriangle, GraduationCap, History, Users } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { api } from "../../api/client";
-import { Badge, Card, CardHeader, EmptyState, SkeletonRows, StatTile } from "../../components/ui";
+import { Badge, Card, CardHeader, EmptyState, ResponsiveTable, SkeletonRows, StatTile } from "../../components/ui";
 import { DashboardHero } from "../../components/DashboardHero";
 
 interface Batch {
@@ -56,42 +56,61 @@ export default function AdminDashboard() {
         {batches === null ? (
           <SkeletonRows rows={4} />
         ) : batches.length === 0 ? (
-          <EmptyState message="No imports yet — start on the Upload tab." icon={History} />
+          <EmptyState message="No imports yet." hint="Start on the Upload or Scan Import tab." icon={History} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50/70 text-left text-xs uppercase tracking-wide text-slate-400">
-                <tr>
-                  <th className="px-5 py-2.5 font-medium">Source</th>
-                  <th className="px-5 py-2.5 font-medium">Uploaded By</th>
-                  <th className="px-5 py-2.5 font-medium">When</th>
-                  <th className="px-5 py-2.5 font-medium">Rows</th>
-                  <th className="px-5 py-2.5 font-medium">Errors</th>
-                </tr>
-              </thead>
-              <tbody>
-                {batches.map((b) => (
-                  <tr key={b.batchId} className="border-t border-slate-100 transition-colors hover:bg-slate-50/70">
-                    <td className="px-5 py-2.5 font-medium text-slate-800">{b.sourceType}</td>
-                    <td className="px-5 py-2.5 text-slate-600">
-                      {b.uploader.name} <span className="text-slate-400">({b.uploader.shortCode})</span>
-                    </td>
-                    <td className="px-5 py-2.5 text-slate-500">{new Date(b.uploadedAt).toLocaleString()}</td>
-                    <td className="px-5 py-2.5 text-slate-600">{b.rowCount}</td>
-                    <td className="px-5 py-2.5">
-                      {b.errorCount > 0 ? (
-                        <Link to="/admin/exceptions">
-                          <Badge tone="red">{b.errorCount}</Badge>
-                        </Link>
-                      ) : (
-                        <Badge tone="green">0</Badge>
-                      )}
-                    </td>
+          <ResponsiveTable
+            table={
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50/70 text-left text-xs uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <th className="px-5 py-2.5 font-medium">Source</th>
+                    <th className="px-5 py-2.5 font-medium">Uploaded By</th>
+                    <th className="px-5 py-2.5 font-medium">When</th>
+                    <th className="px-5 py-2.5 font-medium">Rows</th>
+                    <th className="px-5 py-2.5 font-medium">Errors</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {batches.map((b) => (
+                    <tr key={b.batchId} className="border-t border-slate-100 transition-colors hover:bg-slate-50/70">
+                      <td className="px-5 py-2.5 font-medium text-slate-800">{b.sourceType}</td>
+                      <td className="px-5 py-2.5 text-slate-600">
+                        {b.uploader.name} <span className="text-slate-400">({b.uploader.shortCode})</span>
+                      </td>
+                      <td className="px-5 py-2.5 text-slate-500">{new Date(b.uploadedAt).toLocaleString()}</td>
+                      <td className="px-5 py-2.5 text-slate-600">{b.rowCount}</td>
+                      <td className="px-5 py-2.5">
+                        {b.errorCount > 0 ? (
+                          <Link to="/admin/exceptions">
+                            <Badge tone="red">{b.errorCount}</Badge>
+                          </Link>
+                        ) : (
+                          <Badge tone="green">0</Badge>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            }
+            cards={batches.map((b) => (
+              <li key={b.batchId} className="px-4 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium text-slate-800">{b.sourceType}</span>
+                  {b.errorCount > 0 ? (
+                    <Link to="/admin/exceptions">
+                      <Badge tone="red">{b.errorCount} errors</Badge>
+                    </Link>
+                  ) : (
+                    <Badge tone="green">0 errors</Badge>
+                  )}
+                </div>
+                <div className="mt-1 text-xs text-slate-400">
+                  {b.uploader.name} ({b.uploader.shortCode}) · {new Date(b.uploadedAt).toLocaleString()} · {b.rowCount} rows
+                </div>
+              </li>
+            ))}
+          />
         )}
       </Card>
     </div>

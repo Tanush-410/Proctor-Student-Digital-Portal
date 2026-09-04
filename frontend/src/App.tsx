@@ -16,6 +16,7 @@ import {
   BarChart3,
   History,
   CalendarCheck,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "./auth/AuthContext";
 import Login from "./auth/Login";
@@ -29,6 +30,7 @@ import AdminFaculty from "./portals/admin/AdminFaculty";
 import AdminWorkload from "./portals/admin/AdminWorkload";
 import AdminAnalytics from "./portals/admin/AdminAnalytics";
 import AuditLog from "./portals/admin/AuditLog";
+import AdminActivityPoints from "./portals/admin/AdminActivityPoints";
 
 import ProctorDashboard from "./portals/proctor/ProctorDashboard";
 import UploadResults from "./portals/proctor/UploadResults";
@@ -40,11 +42,13 @@ import StudentDashboard from "./portals/student/StudentDashboard";
 import AcademicRecord from "./portals/student/AcademicRecord";
 import ActivityPointsStudent from "./portals/student/ActivityPointsStudent";
 import MyInfo from "./portals/student/MyInfo";
+import Accolades from "./portals/student/Accolades";
 
 import Directory from "./portals/shared/Directory";
 import StudentDetail from "./portals/shared/StudentDetail";
 import FacultyDetail from "./portals/shared/FacultyDetail";
 import ScanImport from "./portals/shared/ScanImport";
+import AccoladesFeed from "./portals/shared/AccoladesFeed";
 
 const adminTabs = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -56,6 +60,8 @@ const adminTabs = [
   { to: "/admin/exceptions", label: "Exceptions", icon: AlertTriangle },
   { to: "/admin/faculty", label: "Faculty", icon: GraduationCap },
   { to: "/admin/workload", label: "Workload", icon: Scale },
+  { to: "/admin/activity-points", label: "Activity Points", icon: Award },
+  { to: "/admin/accolades", label: "Accolades", icon: Sparkles },
   { to: "/admin/audit-log", label: "Audit Log", icon: History },
 ];
 
@@ -67,12 +73,14 @@ const proctorTabs = [
   { to: "/proctor/calendar", label: "Calendar / PTM", icon: CalendarDays },
   { to: "/proctor/attendance", label: "Attendance", icon: CalendarCheck },
   { to: "/proctor/activity-points", label: "Activity Points", icon: Award },
+  { to: "/proctor/accolades", label: "Accolades", icon: Sparkles },
 ];
 
 const studentTabs = [
   { to: "/student", label: "Dashboard", icon: LayoutDashboard },
   { to: "/student/academic-record", label: "Academic Record", icon: BookOpen },
   { to: "/student/activity-points", label: "Activity Points", icon: Award },
+  { to: "/student/accolades", label: "Accolades", icon: Sparkles },
   { to: "/student/my-info", label: "My Info", icon: IdCard },
 ];
 
@@ -120,6 +128,8 @@ export default function App() {
         <Route path="students/:usn" element={<StudentDetail base="/admin" />} />
         <Route path="workload" element={<AdminWorkload />} />
         <Route path="analytics" element={<AdminAnalytics />} />
+        <Route path="activity-points" element={<AdminActivityPoints />} />
+        <Route path="accolades" element={<AccoladesFeed base="/admin" />} />
         <Route path="audit-log" element={<AuditLog />} />
       </Route>
 
@@ -138,6 +148,7 @@ export default function App() {
         <Route path="calendar" element={<Calendar />} />
         <Route path="attendance" element={<AttendanceMark />} />
         <Route path="activity-points" element={<ActivityPointsReview />} />
+        <Route path="accolades" element={<AccoladesFeed base="/proctor" />} />
         <Route path="faculty/:id" element={<FacultyDetail base="/proctor" />} />
         <Route path="students/:usn" element={<StudentDetail base="/proctor" />} />
       </Route>
@@ -153,6 +164,7 @@ export default function App() {
         <Route index element={<StudentDashboard />} />
         <Route path="academic-record" element={<AcademicRecord />} />
         <Route path="activity-points" element={<ActivityPointsStudent />} />
+        <Route path="accolades" element={<Accolades />} />
         <Route path="my-info" element={<MyInfo />} />
       </Route>
 

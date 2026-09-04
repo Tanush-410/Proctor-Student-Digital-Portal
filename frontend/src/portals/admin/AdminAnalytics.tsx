@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, CalendarCheck, GraduationCap, Layers, Users, XCircle } from "lucide-react";
 import { api } from "../../api/client";
-import { Card, CardHeader, PageSpinner, StatTile } from "../../components/ui";
+import { Card, CardHeader, PageSpinner, ResponsiveTable, StatRowCard, StatTile } from "../../components/ui";
 import { BarChart } from "../../components/charts";
 
 interface GroupStat {
@@ -80,30 +80,44 @@ export default function AdminAnalytics() {
 
       <Card>
         <CardHeader title="By Semester" icon={Layers} />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50/70 text-left text-xs uppercase tracking-wide text-slate-400">
-              <tr>
-                <th className="px-5 py-2.5 font-medium">Semester</th>
-                <th className="px-5 py-2.5 font-medium">Students</th>
-                <th className="px-5 py-2.5 font-medium">Avg. CGPA</th>
-                <th className="px-5 py-2.5 font-medium">Backlogs</th>
-                <th className="px-5 py-2.5 font-medium">At-Risk</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.bySemester.map((s) => (
-                <tr key={s.semester} className="border-t border-slate-100">
-                  <td className="px-5 py-2.5 font-medium text-slate-800">Semester {s.semester}</td>
-                  <td className="px-5 py-2.5 text-slate-600">{s.studentCount}</td>
-                  <td className="px-5 py-2.5 text-slate-600">{s.avgCgpa ?? "N/A"}</td>
-                  <td className="px-5 py-2.5 text-slate-600">{s.backlogCount}</td>
-                  <td className="px-5 py-2.5 text-slate-600">{s.atRiskCount}</td>
+        <ResponsiveTable
+          table={
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50/70 text-left text-xs uppercase tracking-wide text-slate-400">
+                <tr>
+                  <th className="px-5 py-2.5 font-medium">Semester</th>
+                  <th className="px-5 py-2.5 font-medium">Students</th>
+                  <th className="px-5 py-2.5 font-medium">Avg. CGPA</th>
+                  <th className="px-5 py-2.5 font-medium">Backlogs</th>
+                  <th className="px-5 py-2.5 font-medium">At-Risk</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {data.bySemester.map((s) => (
+                  <tr key={s.semester} className="border-t border-slate-100">
+                    <td className="px-5 py-2.5 font-medium text-slate-800">Semester {s.semester}</td>
+                    <td className="px-5 py-2.5 text-slate-600">{s.studentCount}</td>
+                    <td className="px-5 py-2.5 text-slate-600">{s.avgCgpa ?? "N/A"}</td>
+                    <td className="px-5 py-2.5 text-slate-600">{s.backlogCount}</td>
+                    <td className="px-5 py-2.5 text-slate-600">{s.atRiskCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          }
+          cards={data.bySemester.map((s) => (
+            <StatRowCard
+              key={s.semester}
+              title={`Semester ${s.semester}`}
+              stats={[
+                { label: "Students", value: s.studentCount },
+                { label: "Avg CGPA", value: s.avgCgpa ?? "N/A" },
+                { label: "Backlogs", value: s.backlogCount },
+                { label: "At-Risk", value: s.atRiskCount },
+              ]}
+            />
+          ))}
+        />
       </Card>
 
       {attendance && (
@@ -126,30 +140,44 @@ export default function AdminAnalytics() {
 
       <Card>
         <CardHeader title="By Section" icon={Layers} />
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50/70 text-left text-xs uppercase tracking-wide text-slate-400">
-              <tr>
-                <th className="px-5 py-2.5 font-medium">Section</th>
-                <th className="px-5 py-2.5 font-medium">Students</th>
-                <th className="px-5 py-2.5 font-medium">Avg. CGPA</th>
-                <th className="px-5 py-2.5 font-medium">Backlogs</th>
-                <th className="px-5 py-2.5 font-medium">At-Risk</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.bySection.map((s) => (
-                <tr key={s.section} className="border-t border-slate-100">
-                  <td className="px-5 py-2.5 font-medium text-slate-800">{s.section}</td>
-                  <td className="px-5 py-2.5 text-slate-600">{s.studentCount}</td>
-                  <td className="px-5 py-2.5 text-slate-600">{s.avgCgpa ?? "N/A"}</td>
-                  <td className="px-5 py-2.5 text-slate-600">{s.backlogCount}</td>
-                  <td className="px-5 py-2.5 text-slate-600">{s.atRiskCount}</td>
+        <ResponsiveTable
+          table={
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50/70 text-left text-xs uppercase tracking-wide text-slate-400">
+                <tr>
+                  <th className="px-5 py-2.5 font-medium">Section</th>
+                  <th className="px-5 py-2.5 font-medium">Students</th>
+                  <th className="px-5 py-2.5 font-medium">Avg. CGPA</th>
+                  <th className="px-5 py-2.5 font-medium">Backlogs</th>
+                  <th className="px-5 py-2.5 font-medium">At-Risk</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {data.bySection.map((s) => (
+                  <tr key={s.section} className="border-t border-slate-100">
+                    <td className="px-5 py-2.5 font-medium text-slate-800">{s.section}</td>
+                    <td className="px-5 py-2.5 text-slate-600">{s.studentCount}</td>
+                    <td className="px-5 py-2.5 text-slate-600">{s.avgCgpa ?? "N/A"}</td>
+                    <td className="px-5 py-2.5 text-slate-600">{s.backlogCount}</td>
+                    <td className="px-5 py-2.5 text-slate-600">{s.atRiskCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          }
+          cards={data.bySection.map((s) => (
+            <StatRowCard
+              key={s.section}
+              title={`Section ${s.section}`}
+              stats={[
+                { label: "Students", value: s.studentCount },
+                { label: "Avg CGPA", value: s.avgCgpa ?? "N/A" },
+                { label: "Backlogs", value: s.backlogCount },
+                { label: "At-Risk", value: s.atRiskCount },
+              ]}
+            />
+          ))}
+        />
       </Card>
     </div>
   );

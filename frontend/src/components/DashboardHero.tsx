@@ -17,7 +17,7 @@ export function DashboardHero({ eyebrow, title, subtitle, action }: { eyebrow?: 
         src="/bms-logo.svg"
         alt=""
         aria-hidden="true"
-        className="pointer-events-none absolute -bottom-10 -right-6 h-52 w-52 opacity-[0.09] sm:h-64 sm:w-64"
+        className="pointer-events-none absolute -bottom-16 -right-10 h-72 w-72 opacity-[0.14] sm:h-96 sm:w-96"
       />
       <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>

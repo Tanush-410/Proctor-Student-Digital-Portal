@@ -4,7 +4,7 @@ import { Pencil, Search, UserPlus, Users } from "lucide-react";
 import { api, ApiError } from "../../api/client";
 import { useToast } from "../../components/Toast";
 import { Modal } from "../../components/Modal";
-import { Avatar, Badge, Button, Card, CardHeader, EmptyState, Input, Label, Select, SkeletonRows } from "../../components/ui";
+import { Avatar, Badge, Button, Card, CardHeader, EmptyState, IconButton, Input, Label, ResponsiveTable, Select, SkeletonAvatarRows } from "../../components/ui";
 
 interface Faculty {
   facultyId: number;
@@ -173,47 +173,62 @@ export default function AdminFaculty() {
           }
         />
         {faculty === null ? (
-          <SkeletonRows rows={6} />
+          <SkeletonAvatarRows rows={6} />
         ) : filtered.length === 0 ? (
-          <EmptyState message="No faculty matched." />
+          <EmptyState message="No faculty matched." hint="Try a different name, short code, or e-mail." />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50/70 text-left text-xs uppercase tracking-wide text-slate-400">
-                <tr>
-                  <th className="px-5 py-2.5 font-medium">Name</th>
-                  <th className="px-5 py-2.5 font-medium">Short Code</th>
-                  <th className="px-5 py-2.5 font-medium">Role</th>
-                  <th className="px-5 py-2.5 font-medium">Cabin</th>
-                  <th className="px-5 py-2.5 font-medium">Contact</th>
-                  <th className="px-5 py-2.5 font-medium" />
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((f) => (
-                  <tr key={f.facultyId} className="border-t border-slate-100 transition-colors hover:bg-slate-50/70">
-                    <td className="px-5 py-2.5">
-                      <Link to={`/admin/faculty/${f.facultyId}`} className="group flex items-center gap-2.5">
-                        <Avatar name={f.name} size="sm" />
-                        <span className="font-medium text-slate-800 group-hover:text-brand-700">{f.name}</span>
-                      </Link>
-                    </td>
-                    <td className="px-5 py-2.5 font-mono text-xs text-slate-500">{f.shortCode}</td>
-                    <td className="px-5 py-2.5">
-                      <Badge tone={f.role === "ADMIN" ? "blue" : "slate"}>{f.role}</Badge>
-                    </td>
-                    <td className="px-5 py-2.5 text-slate-600">{f.cabinNo ?? "-"}</td>
-                    <td className="px-5 py-2.5 text-slate-600">{f.phone ?? f.email}</td>
-                    <td className="px-5 py-2.5 text-right">
-                      <Button variant="ghost" size="sm" icon={Pencil} onClick={() => startEdit(f)}>
-                        Edit
-                      </Button>
-                    </td>
+          <ResponsiveTable
+            table={
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50/70 text-left text-xs uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <th className="px-5 py-2.5 font-medium">Name</th>
+                    <th className="px-5 py-2.5 font-medium">Short Code</th>
+                    <th className="px-5 py-2.5 font-medium">Role</th>
+                    <th className="px-5 py-2.5 font-medium">Cabin</th>
+                    <th className="px-5 py-2.5 font-medium">Contact</th>
+                    <th className="px-5 py-2.5 font-medium" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filtered.map((f) => (
+                    <tr key={f.facultyId} className="border-t border-slate-100 transition-colors hover:bg-slate-50/70">
+                      <td className="px-5 py-2.5">
+                        <Link to={`/admin/faculty/${f.facultyId}`} className="group flex items-center gap-2.5">
+                          <Avatar name={f.name} size="sm" />
+                          <span className="font-medium text-slate-800 group-hover:text-brand-700">{f.name}</span>
+                        </Link>
+                      </td>
+                      <td className="px-5 py-2.5 font-mono text-xs text-slate-500">{f.shortCode}</td>
+                      <td className="px-5 py-2.5">
+                        <Badge tone={f.role === "ADMIN" ? "blue" : "slate"}>{f.role}</Badge>
+                      </td>
+                      <td className="px-5 py-2.5 text-slate-600">{f.cabinNo ?? "-"}</td>
+                      <td className="px-5 py-2.5 text-slate-600">{f.phone ?? f.email}</td>
+                      <td className="px-5 py-2.5 text-right">
+                        <Button variant="ghost" size="sm" icon={Pencil} onClick={() => startEdit(f)}>
+                          Edit
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            }
+            cards={filtered.map((f) => (
+              <li key={f.facultyId} className="flex items-center gap-3 px-4 py-3">
+                <Link to={`/admin/faculty/${f.facultyId}`} className="flex min-w-0 flex-1 items-center gap-3">
+                  <Avatar name={f.name} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-slate-800">{f.name}</div>
+                    <div className="truncate text-xs text-slate-400">{f.phone ?? f.email}</div>
+                  </div>
+                  <Badge tone={f.role === "ADMIN" ? "blue" : "slate"}>{f.role}</Badge>
+                </Link>
+                <IconButton icon={Pencil} label={`Edit ${f.name}`} onClick={() => startEdit(f)} />
+              </li>
+            ))}
+          />
         )}
       </Card>
     </div>

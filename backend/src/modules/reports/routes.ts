@@ -1,11 +1,20 @@
 import { prisma } from "../../db";
 import { AuthedRequest, requireAuth, requireRole } from "../../middleware/session";
 import { computeCGPA, computeSGPA, getBacklogSubjects, resolvePrecedence } from "../results/engine";
-import { buildParentSummaryPdf } from "./pdf";
+import { buildParentSummaryPdf, buildActivityPointsReportPdf } from "./pdf";
+import { computeActivityPointsAnalytics } from "../activityPoints/routes";
 import { safeRouter } from "../../lib/asyncSafeRouter";
 import { logAudit } from "../../lib/audit";
 
 export const reportsRouter = safeRouter();
+
+// GET /admin/activity-points/report — the downloadable PDF version of the
+// same analytics the Activity Points tab shows on screen.
+reportsRouter.get("/admin/activity-points/report", requireAuth, requireRole("ADMIN"), async (req: AuthedRequest, res) => {
+  const analytics = await computeActivityPointsAnalytics();
+  logAudit(req, "EXPORT", "ActivityPointsReport", "department");
+  buildActivityPointsReportPdf(analytics, res);
+});
 
 // GET /students/:usn/report — generate Parent Summary Report (PDF).
 reportsRouter.get("/students/:usn/report", requireAuth, requireRole("ADMIN", "PROCTOR"), async (req: AuthedRequest, res) => {
