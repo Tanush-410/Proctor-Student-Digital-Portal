@@ -136,12 +136,12 @@ export default function ProctorDashboard() {
       />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        <StatTile label="Proctees" value={students?.length ?? 0} tone="blue" icon={Users} loading={students === null} />
-        <StatTile label="Pending Claims" value={pendingClaims ?? 0} tone={pendingClaims ? "amber" : "green"} icon={Award} loading={pendingClaims === null} />
-        <StatTile label="Upcoming PTMs" value={upcomingPtms ?? 0} icon={CalendarClock} loading={upcomingPtms === null} />
-        <StatTile label="Avg. CGPA" value={analytics?.avgCgpa ?? "N/A"} tone="blue" icon={GraduationCap} loading={analytics === null} />
-        <StatTile label="Backlogs" value={analytics?.backlogCount ?? 0} tone={analytics && analytics.backlogCount > 0 ? "red" : "green"} icon={XCircle} loading={analytics === null} />
-        <StatTile label="At Risk" value={analytics?.atRisk.length ?? 0} tone={analytics && analytics.atRisk.length > 0 ? "amber" : "green"} icon={AlertTriangle} loading={analytics === null} />
+        <StatTile index={0} label="Proctees" value={students?.length ?? 0} tone="blue" icon={Users} loading={students === null} />
+        <StatTile index={1} label="Pending Claims" value={pendingClaims ?? 0} tone={pendingClaims ? "amber" : "green"} icon={Award} loading={pendingClaims === null} />
+        <StatTile index={2} label="Upcoming PTMs" value={upcomingPtms ?? 0} icon={CalendarClock} loading={upcomingPtms === null} />
+        <StatTile index={3} label="Avg. CGPA" value={analytics?.avgCgpa ?? "N/A"} tone="blue" icon={GraduationCap} loading={analytics === null} />
+        <StatTile index={4} label="Backlogs" value={analytics?.backlogCount ?? 0} tone={analytics && analytics.backlogCount > 0 ? "red" : "green"} icon={XCircle} loading={analytics === null} />
+        <StatTile index={5} label="At Risk" value={analytics?.atRisk.length ?? 0} tone={analytics && analytics.atRisk.length > 0 ? "amber" : "green"} icon={AlertTriangle} loading={analytics === null} />
       </div>
 
       {analytics && analytics.atRisk.length > 0 && (

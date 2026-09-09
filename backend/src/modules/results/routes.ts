@@ -3,7 +3,8 @@ import { z } from "zod";
 import { prisma } from "../../db";
 import { AuthedRequest, requireAuth, requireRole } from "../../middleware/session";
 import { parseSheet, normaliseKeys } from "../ingestion/engine";
-import { computeCGPA, computeSGPA, getBacklogSubjects, resolvePrecedence, SourceType } from "./engine";
+import { computeCGPA, computeSGPA, getBacklogSubjects, gradeToPoint, resolvePrecedence, SourceType } from "./engine";
+import { computeAcademicStatus } from "./academicStatus";
 import { safeRouter } from "../../lib/asyncSafeRouter";
 
 export const resultsRouter = safeRouter();
@@ -103,6 +104,7 @@ resultsRouter.get("/students/:usn/results/effective", requireAuth, requireRole("
       subjectCode: r.subjectCode,
       semester: r.semester,
       effective: r.effective,
+      gradePoint: gradeToPoint(r.effective.grade),
       discrepancy: r.discrepancy,
       recordCount: r.allRecords.length,
     })),
@@ -110,6 +112,23 @@ resultsRouter.get("/students/:usn/results/effective", requireAuth, requireRole("
     cgpa: computeCGPA(effective),
     backlogSubjects: getBacklogSubjects(effective).map((r) => ({ subjectCode: r.subjectCode, semester: r.semester })),
   });
+});
+
+// GET /students/:usn/academic-status — what the student needs to do next
+// (backlogs, make-up-eligible grades, CGPA probation, 7th-semester
+// eligibility), computed from BMSCE's published Academic Rules & Regulations.
+resultsRouter.get("/students/:usn/academic-status", requireAuth, requireRole("ADMIN", "PROCTOR", "STUDENT"), async (req: AuthedRequest, res) => {
+  const { usn } = req.params;
+  if (!(await assertCanRead(req, usn, res))) return;
+
+  const student = await prisma.student.findUnique({ where: { usn } });
+  if (!student) return res.status(404).json({ error: "Student not found" });
+
+  const records = await prisma.resultRecord.findMany({ where: { usn } });
+  const effective = resolvePrecedence(records);
+  const cgpa = computeCGPA(effective);
+
+  res.json(computeAcademicStatus(effective, cgpa, student.currentSemester));
 });
 
 // GET /students/:usn/results — raw append-only history (all source records), for audit views.

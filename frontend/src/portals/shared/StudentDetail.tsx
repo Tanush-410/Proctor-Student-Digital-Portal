@@ -1,11 +1,12 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Award, CalendarCheck, CalendarPlus, CheckCircle2, Clock, Download, FileText, GraduationCap, MessageSquarePlus, Paperclip, Sparkles, StickyNote, Trash2, Users, XCircle } from "lucide-react";
+import { AlertTriangle, Award, CalendarCheck, CalendarPlus, CheckCircle2, Clock, Download, FileText, GraduationCap, MessageSquarePlus, Paperclip, ShieldAlert, Sparkles, StickyNote, Trash2, Users, XCircle } from "lucide-react";
 import { api, ApiError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useToast } from "../../components/Toast";
-import { Avatar, Badge, Breadcrumb, Button, Card, CardHeader, EmptyState, PageSpinner, ResponsiveTable, Select, StatTile, Textarea } from "../../components/ui";
+import { Avatar, Badge, Breadcrumb, Button, Card, CardHeader, EmptyState, PageSpinner, ResponsiveTable, Select, SemesterTabs, StatTile, Textarea } from "../../components/ui";
 import { BarChart } from "../../components/charts";
+import { ResultTable, ResultTableRow } from "./ResultTable";
 
 interface StudentFull {
   usn: string;
@@ -26,12 +27,7 @@ interface StudentFull {
   proctor: { facultyId: number; name: string; shortCode: string; email: string; cabinNo: string | null; phone: string | null } | null;
 }
 
-interface EffectiveRow {
-  subjectCode: string;
-  semester: number;
-  effective: { subjectName: string | null; grade: string | null; totalMarks: number | null; status: string; sourceType: string };
-  discrepancy: boolean;
-}
+type EffectiveRow = ResultTableRow & { semester: number };
 
 interface Claim {
   claimId: number;
@@ -55,6 +51,21 @@ interface Comparison {
   cgpa: number | null;
   section: { label: string; avgCgpa: number | null; percentile: number | null; rank: number | null; of: number } | null;
   semester: { label: string; avgCgpa: number | null; percentile: number | null; rank: number | null; of: number };
+}
+
+interface SubjectFlag {
+  subjectCode: string;
+  subjectName: string | null;
+  semester: number;
+  grade: string;
+  action: { code: string; label: string; detail: string };
+}
+interface AcademicStatus {
+  backlogs: SubjectFlag[];
+  transitional: SubjectFlag[];
+  cgpaWarning: string | null;
+  seventhSemesterEligible: boolean | null;
+  seventhSemesterBlockers: string[];
 }
 
 interface ProctorOption {
@@ -117,6 +128,8 @@ export default function StudentDetail({ base }: { base: string }) {
   const [reassigning, setReassigning] = useState(false);
   const [attendance, setAttendance] = useState<AttendanceSummary | null>(null);
   const [accolades, setAccolades] = useState<AccoladeItem[] | null>(null);
+  const [activeSem, setActiveSem] = useState<number | null>(null);
+  const [academicStatus, setAcademicStatus] = useState<AcademicStatus | null>(null);
 
   function loadNotes() {
     if (!usn) return;
@@ -132,12 +145,15 @@ export default function StudentDetail({ base }: { base: string }) {
         setStudent(s);
         setResults(r);
         setActivity(a);
+        const sems = [...new Set((r.results as EffectiveRow[]).map((row) => row.semester))].sort((x, y) => x - y);
+        setActiveSem(sems[sems.length - 1] ?? null);
       })
       .catch((e) => setError(e.message ?? "Failed to load student"));
     loadNotes();
     api.get(`/students/${usn}/analytics/comparison`).then(setComparison);
     api.get(`/students/${usn}/attendance/summary`).then(setAttendance);
     api.get(`/students/${usn}/accolades`).then(setAccolades);
+    api.get(`/students/${usn}/academic-status`).then(setAcademicStatus);
   }, [usn]);
 
   useEffect(() => {
@@ -207,6 +223,7 @@ export default function StudentDetail({ base }: { base: string }) {
   if (!student) return <PageSpinner />;
 
   const semesters = [...new Set((results?.results ?? []).map((r) => r.semester))].sort((a, b) => a - b);
+  const semResults = (results?.results ?? []).filter((r) => r.semester === activeSem);
 
   return (
     <div className="space-y-6">
@@ -266,11 +283,25 @@ export default function StudentDetail({ base }: { base: string }) {
       </Card>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-        <StatTile label="CGPA" value={results?.cgpa ?? "N/A"} tone="blue" icon={GraduationCap} />
-        <StatTile label="Backlogs" value={results?.backlogSubjects.length ?? 0} tone={results && results.backlogSubjects.length > 0 ? "red" : "green"} icon={results && results.backlogSubjects.length > 0 ? XCircle : CheckCircle2} />
-        <StatTile label="Activity Points" value={activity?.runningTotal ?? 0} tone="amber" icon={Award} />
-        <StatTile label="Pending Claims" value={activity?.claims.filter((c) => c.status === "PENDING").length ?? 0} />
         <StatTile
+          index={0}
+          label="CGPA"
+          value={results?.cgpa ?? "N/A"}
+          tone="blue"
+          icon={GraduationCap}
+          trend={
+            results
+              ? Object.entries(results.sgpaBySemester)
+                  .sort((a, b) => Number(a[0]) - Number(b[0]))
+                  .map(([, v]) => v)
+                  .filter((v): v is number => v !== null)
+              : undefined
+          }
+        />
+        <StatTile index={1} label="Backlogs" value={results?.backlogSubjects.length ?? 0} tone={results && results.backlogSubjects.length > 0 ? "red" : "green"} icon={results && results.backlogSubjects.length > 0 ? XCircle : CheckCircle2} />
+        <StatTile index={2} label="Activity Points" value={activity?.runningTotal ?? 0} tone="amber" icon={Award} />
+        <StatTile index={3} label="Pending Claims" value={activity?.claims.filter((c) => c.status === "PENDING").length ?? 0} />
+        <StatTile index={4}
           label="Attendance"
           value={attendance?.percentage ?? "N/A"}
           tone={attendance?.percentage !== null && attendance !== null && attendance.percentage! < 75 ? "red" : "green"}
@@ -326,77 +357,44 @@ export default function StudentDetail({ base }: { base: string }) {
         </Card>
       )}
 
+      {academicStatus && (academicStatus.cgpaWarning || academicStatus.backlogs.length > 0 || academicStatus.transitional.length > 0 || academicStatus.seventhSemesterEligible === false) && (
+        <Card>
+          <CardHeader title="Academic Status" subtitle="What this student needs to do next, per BMSCE's Academic Rules & Regulations." icon={ShieldAlert} />
+          <div className="space-y-3 px-5 py-4">
+            {academicStatus.cgpaWarning && (
+              <div className="flex items-start gap-2.5 rounded-lg bg-red-50 px-3.5 py-3 text-sm text-red-800 ring-1 ring-inset ring-red-600/20">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{academicStatus.cgpaWarning}</span>
+              </div>
+            )}
+            {academicStatus.seventhSemesterEligible === false && (
+              <div className="flex items-start gap-2.5 rounded-lg bg-amber-50 px-3.5 py-3 text-sm text-amber-800 ring-1 ring-inset ring-amber-600/20">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <span className="font-medium">Not yet eligible for Semester VII</span> — every Semester 1 &amp; 2 course must be cleared first. Pending: {academicStatus.seventhSemesterBlockers.join("; ")}.
+                </div>
+              </div>
+            )}
+            {academicStatus.backlogs.length > 0 && (
+              <AcademicStatusTable title={`Backlogs (${academicStatus.backlogs.length})`} rows={academicStatus.backlogs} tone="red" />
+            )}
+            {academicStatus.transitional.length > 0 && (
+              <AcademicStatusTable title={`Pending Resolution (${academicStatus.transitional.length})`} rows={academicStatus.transitional} tone="amber" />
+            )}
+          </div>
+        </Card>
+      )}
+
       <Card>
         <CardHeader title="Academic Record" subtitle="Precedence-resolved effective result per subject; full history is append-only." icon={FileText} />
         {semesters.length === 0 ? (
           <EmptyState message="No result records yet." icon={FileText} />
         ) : (
-          <div className="divide-y divide-slate-100">
-            {semesters.map((sem) => (
-              <div key={sem} className="px-5 py-4">
-                <div className="mb-2.5 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-slate-700">Semester {sem}</h3>
-                  <Badge tone="blue">SGPA {results?.sgpaBySemester[sem] ?? "N/A"}</Badge>
-                </div>
-                <ResponsiveTable
-                  table={
-                    <table className="w-full text-sm">
-                      <thead className="text-left text-xs uppercase tracking-wide text-slate-400">
-                        <tr>
-                          <th className="py-1.5 pr-4 font-medium">Subject</th>
-                          <th className="py-1.5 pr-4 font-medium">Grade</th>
-                          <th className="py-1.5 pr-4 font-medium">Marks</th>
-                          <th className="py-1.5 pr-4 font-medium">Status</th>
-                          <th className="py-1.5 pr-4 font-medium">Source</th>
-                          <th className="py-1.5 pr-4 font-medium" />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {results?.results
-                          .filter((r) => r.semester === sem)
-                          .map((r) => (
-                            <tr key={r.subjectCode} className="border-t border-slate-50 transition-colors hover:bg-slate-50/70">
-                              <td className="py-2 pr-4 text-slate-700">
-                                {r.subjectCode}
-                                {r.effective.subjectName ? <span className="text-slate-400"> — {r.effective.subjectName}</span> : ""}
-                              </td>
-                              <td className="py-2 pr-4 font-semibold text-slate-800">{r.effective.grade ?? "-"}</td>
-                              <td className="py-2 pr-4 text-slate-600">{r.effective.totalMarks ?? "-"}</td>
-                              <td className="py-2 pr-4">
-                                <Badge tone={r.effective.status === "PASS" ? "green" : "red"} icon={r.effective.status === "PASS" ? CheckCircle2 : XCircle}>
-                                  {r.effective.status}
-                                </Badge>
-                              </td>
-                              <td className="py-2 pr-4 text-slate-500">{r.effective.sourceType}</td>
-                              <td className="py-2 pr-4">{r.discrepancy && <Badge tone="amber">discrepancy</Badge>}</td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
-                  }
-                  cards={(results?.results.filter((r) => r.semester === sem) ?? []).map((r) => (
-                    <li key={r.subjectCode} className="py-2.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="text-sm text-slate-700">
-                            {r.subjectCode}
-                            {r.effective.subjectName && <div className="text-xs text-slate-400">{r.effective.subjectName}</div>}
-                          </div>
-                        </div>
-                        <span className="shrink-0 text-sm font-semibold text-slate-800">{r.effective.grade ?? "-"}</span>
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                        <Badge tone={r.effective.status === "PASS" ? "green" : "red"} icon={r.effective.status === "PASS" ? CheckCircle2 : XCircle}>
-                          {r.effective.status}
-                        </Badge>
-                        <span className="text-xs text-slate-400">{r.effective.totalMarks ?? "-"} marks · {r.effective.sourceType}</span>
-                        {r.discrepancy && <Badge tone="amber">discrepancy</Badge>}
-                      </div>
-                    </li>
-                  ))}
-                />
-              </div>
-            ))}
+          <div className="px-5 py-4">
+            <SemesterTabs semesters={semesters} active={activeSem ?? semesters[semesters.length - 1]} onChange={setActiveSem} />
+            <div className="mt-4">
+              <ResultTable sgpa={activeSem !== null ? results?.sgpaBySemester[activeSem] ?? null : null} rows={semResults} />
+            </div>
           </div>
         )}
       </Card>
@@ -512,6 +510,64 @@ export default function StudentDetail({ base }: { base: string }) {
           </ul>
         )}
       </Card>
+    </div>
+  );
+}
+
+/** A compact, scannable table for a set of subject-level academic-status
+ * flags (backlogs or transitional grades) — course/sem/grade line up in
+ * columns, with the required action as a short label plus its full rule
+ * explanation underneath, instead of one long paragraph per card. */
+function AcademicStatusTable({ title, rows, tone }: { title: string; rows: SubjectFlag[]; tone: "red" | "amber" }) {
+  return (
+    <div>
+      <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h4>
+      <div className="overflow-hidden rounded-lg border border-slate-200">
+        <ResponsiveTable
+          table={
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="border-b border-slate-200 px-3.5 py-2">Course</th>
+                  <th className="border-b border-slate-200 px-3.5 py-2">Sem</th>
+                  <th className="border-b border-slate-200 px-3.5 py-2">Grade</th>
+                  <th className="border-b border-slate-200 px-3.5 py-2">Required Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={`${r.semester}-${r.subjectCode}`} className="border-t border-slate-100 align-top">
+                    <td className="px-3.5 py-2.5 text-slate-800">
+                      <div className="font-medium">{r.subjectCode}</div>
+                      {r.subjectName && <div className="text-xs text-slate-400">{r.subjectName}</div>}
+                    </td>
+                    <td className="px-3.5 py-2.5 text-slate-600">{r.semester}</td>
+                    <td className="px-3.5 py-2.5">
+                      <Badge tone={tone}>{r.grade}</Badge>
+                    </td>
+                    <td className="px-3.5 py-2.5">
+                      <div className="font-medium text-slate-800">{r.action.label}</div>
+                      <p className="mt-0.5 text-xs text-slate-500">{r.action.detail}</p>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          }
+          cards={rows.map((r) => (
+            <li key={`${r.semester}-${r.subjectCode}`} className="px-3.5 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone={tone}>{r.grade}</Badge>
+                <span className="text-sm font-medium text-slate-800">{r.subjectCode}</span>
+                <span className="text-xs text-slate-400">Sem {r.semester}</span>
+              </div>
+              {r.subjectName && <div className="mt-0.5 text-xs text-slate-400">{r.subjectName}</div>}
+              <div className="mt-1.5 text-sm font-medium text-slate-800">{r.action.label}</div>
+              <p className="mt-0.5 text-xs text-slate-500">{r.action.detail}</p>
+            </li>
+          ))}
+        />
+      </div>
     </div>
   );
 }

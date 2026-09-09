@@ -139,10 +139,10 @@ export default function FacultyDetail({ base }: { base: string }) {
       {faculty.role === "PROCTOR" && analytics && (
         <>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <StatTile label="Proctees" value={analytics.proctee_count} icon={Users} />
-            <StatTile label="Avg. CGPA" value={analytics.avgCgpa ?? "N/A"} tone="blue" icon={GraduationCap} />
-            <StatTile label="Backlogs" value={analytics.backlogCount} tone={analytics.backlogCount > 0 ? "red" : "green"} icon={XCircle} />
-            <StatTile label="Pending Claims" value={analytics.pendingClaims} tone={analytics.pendingClaims > 0 ? "amber" : "green"} icon={Award} />
+            <StatTile index={0} label="Proctees" value={analytics.proctee_count} icon={Users} />
+            <StatTile index={1} label="Avg. CGPA" value={analytics.avgCgpa ?? "N/A"} tone="blue" icon={GraduationCap} />
+            <StatTile index={2} label="Backlogs" value={analytics.backlogCount} tone={analytics.backlogCount > 0 ? "red" : "green"} icon={XCircle} />
+            <StatTile index={3} label="Pending Claims" value={analytics.pendingClaims} tone={analytics.pendingClaims > 0 ? "amber" : "green"} icon={Award} />
           </div>
 
           {analytics.atRisk.length > 0 && (

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { History, ShieldCheck } from "lucide-react";
 import { api } from "../../api/client";
-import { Badge, Button, Card, CardHeader, EmptyState, Input, ResponsiveTable, SkeletonRows } from "../../components/ui";
+import { Badge, Button, Card, EmptyState, Input, ResponsiveTable, SkeletonRows, StickyScrollTable } from "../../components/ui";
 
 interface Entry {
   id: number;
@@ -109,34 +109,36 @@ export default function AuditLog() {
           <>
             <ResponsiveTable
               table={
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50/70 text-left text-xs uppercase tracking-wide text-slate-400">
-                    <tr>
-                      <th className="px-5 py-2.5 font-medium">When</th>
-                      <th className="px-5 py-2.5 font-medium">Actor</th>
-                      <th className="px-5 py-2.5 font-medium">Action</th>
-                      <th className="px-5 py-2.5 font-medium">Target</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {entries.map((e) => (
-                      <tr key={e.id} className="border-t border-slate-100 align-top">
-                        <td className="whitespace-nowrap px-5 py-2.5 text-slate-500">{new Date(e.createdAt).toLocaleString()}</td>
-                        <td className="px-5 py-2.5 text-slate-700">
-                          {e.actor ? `${e.actor.name} (${e.actor.shortCode})` : "System"}
-                          <span className="ml-1.5 text-xs text-slate-400">{e.actorRole}</span>
-                        </td>
-                        <td className="px-5 py-2.5">
-                          <Badge tone={ACTION_TONE[e.action] ?? "slate"}>{e.action}</Badge>
-                        </td>
-                        <td className="px-5 py-2.5 text-slate-600">
-                          <span className="font-medium text-slate-700">{e.targetType}</span>{" "}
-                          <span className="font-mono text-xs text-slate-400">{e.targetId}</span>
-                        </td>
+                <StickyScrollTable maxHeight="36rem">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 z-10 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400 shadow-[0_1px_0_0_theme(colors.slate.200)]">
+                      <tr>
+                        <th className="px-5 py-2.5 font-medium">When</th>
+                        <th className="px-5 py-2.5 font-medium">Actor</th>
+                        <th className="px-5 py-2.5 font-medium">Action</th>
+                        <th className="px-5 py-2.5 font-medium">Target</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {entries.map((e) => (
+                        <tr key={e.id} className="border-t border-slate-100 align-top">
+                          <td className="whitespace-nowrap px-5 py-2.5 text-slate-500">{new Date(e.createdAt).toLocaleString()}</td>
+                          <td className="px-5 py-2.5 text-slate-700">
+                            {e.actor ? `${e.actor.name} (${e.actor.shortCode})` : "System"}
+                            <span className="ml-1.5 text-xs text-slate-400">{e.actorRole}</span>
+                          </td>
+                          <td className="px-5 py-2.5">
+                            <Badge tone={ACTION_TONE[e.action] ?? "slate"}>{e.action}</Badge>
+                          </td>
+                          <td className="px-5 py-2.5 text-slate-600">
+                            <span className="font-medium text-slate-700">{e.targetType}</span>{" "}
+                            <span className="font-mono text-xs text-slate-400">{e.targetId}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </StickyScrollTable>
               }
               cards={entries.map((e) => (
                 <li key={e.id} className="px-4 py-3">

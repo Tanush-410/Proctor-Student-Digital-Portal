@@ -83,10 +83,10 @@ export default function StudentDashboard() {
       />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatTile label="CGPA" value={cgpa ?? "N/A"} tone="blue" icon={GraduationCap} loading={cgpa === null} />
-        <StatTile label="Backlog Subjects" value={backlogs ?? 0} tone={backlogs ? "red" : "green"} icon={backlogs ? XCircle : CheckCircle2} loading={backlogs === null} />
-        <StatTile label="Activity Points" value={points ?? 0} tone="amber" icon={Award} loading={points === null} />
-        <StatTile
+        <StatTile index={0} label="CGPA" value={cgpa ?? "N/A"} tone="blue" icon={GraduationCap} loading={cgpa === null} />
+        <StatTile index={1} label="Backlog Subjects" value={backlogs ?? 0} tone={backlogs ? "red" : "green"} icon={backlogs ? XCircle : CheckCircle2} loading={backlogs === null} />
+        <StatTile index={2} label="Activity Points" value={points ?? 0} tone="amber" icon={Award} loading={points === null} />
+        <StatTile index={3}
           label="Attendance"
           value={attendance?.percentage !== null && attendance?.percentage !== undefined ? `${attendance.percentage}%` : "N/A"}
           tone={attendance?.percentage !== null && attendance !== null && attendance.percentage! < 75 ? "red" : "green"}

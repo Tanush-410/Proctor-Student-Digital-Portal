@@ -129,6 +129,7 @@ model ActivityPointClaim {
   grantedPoints   Int?        @map("granted_points")
   status          String      @default("PENDING")
   remarks         String?
+  semester        Int?
   submittedAt     DateTime    @default(now()) @map("submitted_at")
   reviewedAt      DateTime?   @map("reviewed_at")
 

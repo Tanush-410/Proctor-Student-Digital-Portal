@@ -40,9 +40,9 @@ export default function AdminDashboard() {
       />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <StatTile label="Students" value={studentCount ?? 0} tone="blue" icon={GraduationCap} loading={studentCount === null} />
-        <StatTile label="Faculty" value={facultyCount ?? 0} icon={Users} loading={facultyCount === null} />
-        <StatTile
+        <StatTile index={0} label="Students" value={studentCount ?? 0} tone="blue" icon={GraduationCap} loading={studentCount === null} />
+        <StatTile index={1} label="Faculty" value={facultyCount ?? 0} icon={Users} loading={facultyCount === null} />
+        <StatTile index={2}
           label="Unresolved Exceptions"
           value={exceptionCount ?? 0}
           tone={exceptionCount ? "red" : "green"}

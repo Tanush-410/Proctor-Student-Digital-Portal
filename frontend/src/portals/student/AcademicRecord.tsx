@@ -1,30 +1,33 @@
 import { FormEvent, useEffect, useState } from "react";
-import { CheckCircle2, FilePlus2, GraduationCap, XCircle } from "lucide-react";
+import { FilePlus2, GraduationCap } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { api, ApiError } from "../../api/client";
 import { useToast } from "../../components/Toast";
-import { Badge, Button, Card, CardHeader, EmptyState, Input, Label, PageSpinner, ResponsiveTable, StatTile } from "../../components/ui";
+import { Button, Card, CardHeader, EmptyState, Input, Label, PageSpinner, SemesterTabs, StatTile } from "../../components/ui";
+import { ResultTable, ResultTableRow } from "../shared/ResultTable";
 
-interface EffectiveRow {
-  subjectCode: string;
-  semester: number;
-  effective: { subjectName: string | null; grade: string | null; totalMarks: number | null; status: string; sourceType: string };
-  discrepancy: boolean;
-}
+type EffectiveRow = ResultTableRow & { semester: number };
 
 export default function AcademicRecord() {
   const { auth } = useAuth();
   const usn = auth && "usn" in auth.profile ? auth.profile.usn : "";
   const [results, setResults] = useState<{ results: EffectiveRow[]; sgpaBySemester: Record<string, number | null>; cgpa: number | null } | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [activeSem, setActiveSem] = useState<number | null>(null);
 
   function load() {
-    if (usn) api.get(`/students/${usn}/results/effective`).then(setResults);
+    if (!usn) return;
+    api.get(`/students/${usn}/results/effective`).then((data: { results: EffectiveRow[]; sgpaBySemester: Record<string, number | null>; cgpa: number | null }) => {
+      setResults(data);
+      const sems = [...new Set(data.results.map((r) => r.semester))].sort((a, b) => a - b);
+      setActiveSem((prev) => (prev !== null && sems.includes(prev) ? prev : sems[sems.length - 1] ?? null));
+    });
   }
 
   useEffect(load, [usn]);
 
   const semesters = [...new Set((results?.results ?? []).map((r) => r.semester))].sort((a, b) => a - b);
+  const semResults = (results?.results ?? []).filter((r) => r.semester === activeSem);
 
   return (
     <div className="space-y-6">
@@ -42,7 +45,16 @@ export default function AcademicRecord() {
         <PageSpinner />
       ) : (
         <>
-          <StatTile label="CGPA" value={results.cgpa ?? "N/A"} tone="blue" icon={GraduationCap} />
+          <StatTile
+            label="CGPA"
+            value={results.cgpa ?? "N/A"}
+            tone="blue"
+            icon={GraduationCap}
+            trend={Object.entries(results.sgpaBySemester)
+              .sort((a, b) => Number(a[0]) - Number(b[0]))
+              .map(([, v]) => v)
+              .filter((v): v is number => v !== null)}
+          />
 
           {showForm && (
             <SelfEntryForm
@@ -59,72 +71,11 @@ export default function AcademicRecord() {
             {semesters.length === 0 ? (
               <EmptyState message="No results recorded yet." icon={GraduationCap} />
             ) : (
-              <div className="divide-y divide-slate-100">
-                {semesters.map((sem) => (
-                  <div key={sem} className="px-5 py-4">
-                    <div className="mb-2.5 flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-slate-700">Semester {sem}</h3>
-                      <Badge tone="blue">SGPA {results.sgpaBySemester[sem] ?? "N/A"}</Badge>
-                    </div>
-                    <ResponsiveTable
-                      table={
-                        <table className="w-full text-sm">
-                          <thead className="text-left text-xs uppercase tracking-wide text-slate-400">
-                            <tr>
-                              <th className="py-1.5 pr-4 font-medium">Subject</th>
-                              <th className="py-1.5 pr-4 font-medium">Grade</th>
-                              <th className="py-1.5 pr-4 font-medium">Marks</th>
-                              <th className="py-1.5 pr-4 font-medium">Status</th>
-                              <th className="py-1.5 pr-4 font-medium" />
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {results.results
-                              .filter((r) => r.semester === sem)
-                              .map((r) => (
-                                <tr key={r.subjectCode} className="border-t border-slate-50 transition-colors hover:bg-slate-50/70">
-                                  <td className="py-2 pr-4 text-slate-700">
-                                    {r.subjectCode}
-                                    {r.effective.subjectName ? <span className="text-slate-400"> — {r.effective.subjectName}</span> : ""}
-                                  </td>
-                                  <td className="py-2 pr-4 font-semibold text-slate-800">{r.effective.grade ?? "-"}</td>
-                                  <td className="py-2 pr-4 text-slate-600">{r.effective.totalMarks ?? "-"}</td>
-                                  <td className="py-2 pr-4">
-                                    <Badge tone={r.effective.status === "PASS" ? "green" : "red"} icon={r.effective.status === "PASS" ? CheckCircle2 : XCircle}>
-                                      {r.effective.status}
-                                    </Badge>
-                                  </td>
-                                  <td className="py-2 pr-4">{r.discrepancy && <Badge tone="amber">recheck: differs from your entry</Badge>}</td>
-                                </tr>
-                              ))}
-                          </tbody>
-                        </table>
-                      }
-                      cards={results.results
-                        .filter((r) => r.semester === sem)
-                        .map((r) => (
-                          <li key={r.subjectCode} className="py-2.5">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <div className="text-sm text-slate-700">
-                                  {r.subjectCode}
-                                  {r.effective.subjectName && <div className="text-xs text-slate-400">{r.effective.subjectName}</div>}
-                                </div>
-                              </div>
-                              <span className="shrink-0 text-sm font-semibold text-slate-800">{r.effective.grade ?? "-"}</span>
-                            </div>
-                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                              <Badge tone={r.effective.status === "PASS" ? "green" : "red"} icon={r.effective.status === "PASS" ? CheckCircle2 : XCircle}>
-                                {r.effective.status}
-                              </Badge>
-                              <span className="text-xs text-slate-400">{r.effective.totalMarks ?? "-"} marks</span>
-                              {r.discrepancy && <Badge tone="amber">recheck: differs from your entry</Badge>}
-                            </div>
-                          </li>
-                        ))}
-                    />
-                  </div>
-                ))}
+              <div className="px-5 py-4">
+                <SemesterTabs semesters={semesters} active={activeSem ?? semesters[semesters.length - 1]} onChange={setActiveSem} />
+                <div className="mt-4">
+                  <ResultTable sgpa={activeSem !== null ? results.sgpaBySemester[activeSem] ?? null : null} rows={semResults} />
+                </div>
               </div>
             )}
           </Card>

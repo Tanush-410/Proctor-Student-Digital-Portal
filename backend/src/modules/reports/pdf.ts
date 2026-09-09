@@ -50,6 +50,42 @@ function drawWatermark(doc: Doc) {
   doc.restore();
 }
 
+/** The same brand-blue gradient banner the web app opens every portal page
+ * with (DashboardHero.tsx) — a rounded gradient panel, the crest large and
+ * faint in the corner, title/subtitle in white — so a printed report and the
+ * screen it came from read as the same product instead of a plain document
+ * bolted onto a designed app. Returns the y-position just below the banner
+ * so the rest of the report can flow beneath it. */
+function drawHeroBanner(doc: Doc, title: string, subtitle: string): number {
+  const left = doc.page.margins.left;
+  const top = doc.y;
+  const w = doc.page.width - left - doc.page.margins.right;
+  const h = 96;
+  const radius = 10;
+
+  doc.save();
+  doc.roundedRect(left, top, w, h, radius).clip();
+  const gradient = doc.linearGradient(left, top, left + w, top + h);
+  gradient.stop(0, "#00427d").stop(0.55, "#00519c").stop(1, "#032a4d");
+  doc.rect(left, top, w, h).fill(gradient);
+
+  if (fs.existsSync(LOGO_PATH)) {
+    const crestSize = h * 1.9;
+    doc.opacity(0.16);
+    doc.image(LOGO_PATH, left + w - crestSize * 0.62, top + h - crestSize * 0.72, { width: crestSize, height: crestSize });
+    doc.opacity(1);
+  }
+  doc.restore();
+
+  doc.save();
+  doc.fillColor("#ffffff").fontSize(17).text(title, left + 22, top + 20, { width: w - 44 });
+  doc.fillColor("#cfe0f2").fontSize(9.5).text(subtitle, left + 22, top + 44, { width: w - 220 });
+  doc.restore();
+  doc.fillColor("black");
+
+  return top + h + 18;
+}
+
 /** ReportGenerationService.buildParentSummary — streams a PDF built from the effective-results view. */
 export function buildParentSummaryPdf(data: ParentSummaryData, res: Response) {
   const doc = new PDFDocument({ margin: 50 });
@@ -60,15 +96,9 @@ export function buildParentSummaryPdf(data: ParentSummaryData, res: Response) {
   drawWatermark(doc);
   doc.on("pageAdded", () => drawWatermark(doc));
 
-  if (fs.existsSync(LOGO_PATH)) {
-    doc.image(LOGO_PATH, doc.page.width / 2 - 32, doc.y, { width: 64, height: 64 });
-    doc.moveDown(4.6);
-  }
-  doc.fontSize(18).text("Parent Summary Report", { align: "center" });
-  doc.moveDown(0.5);
-  doc.fontSize(10).fillColor("gray").text("BMS College of Engineering — Online Proctor Diary & Student Academic Management System", { align: "center" });
-  doc.fillColor("black");
-  doc.moveDown(1.5);
+  doc.y = drawHeroBanner(doc, "Parent Summary Report", "BMS College of Engineering — Online Proctor Diary & Student Academic Management System");
+  doc.x = doc.page.margins.left;
+  doc.moveDown(0.6);
 
   doc.fontSize(13).text("Student Details");
   doc.moveDown(0.3);
@@ -157,15 +187,9 @@ export function buildActivityPointsReportPdf(data: ActivityPointsReportData, res
   drawWatermark(doc);
   doc.on("pageAdded", () => drawWatermark(doc));
 
-  if (fs.existsSync(LOGO_PATH)) {
-    doc.image(LOGO_PATH, doc.page.width / 2 - 32, doc.y, { width: 64, height: 64 });
-    doc.moveDown(4.6);
-  }
-  doc.fontSize(18).text("Activity Points Report", { align: "center" });
-  doc.moveDown(0.5);
-  doc.fontSize(10).fillColor("gray").text("BMS College of Engineering — Department-wide Summary", { align: "center" });
-  doc.fillColor("black");
-  doc.moveDown(1.5);
+  doc.y = drawHeroBanner(doc, "Activity Points Report", "BMS College of Engineering — Department-wide Summary");
+  doc.x = doc.page.margins.left;
+  doc.moveDown(0.6);
 
   doc.fontSize(13).text("Overview");
   doc.moveDown(0.3);

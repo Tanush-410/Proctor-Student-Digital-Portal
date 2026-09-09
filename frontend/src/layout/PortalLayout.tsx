@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import { LogOut, Menu, Search, X, type LucideIcon } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar, Badge } from "../components/ui";
@@ -16,6 +17,7 @@ export default function PortalLayout({ tabs, portalName }: { tabs: Tab[]; portal
   const { auth, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const location = useLocation();
   useCommandPaletteShortcut(() => setPaletteOpen(true));
 
   useEffect(() => {
@@ -173,8 +175,18 @@ export default function PortalLayout({ tabs, portalName }: { tabs: Tab[]; portal
             <NotificationBell />
           </div>
         )}
-        <div className="animate-in relative z-10 mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-          <Outlet />
+        <div className="relative z-10 mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <Outlet />
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
 
