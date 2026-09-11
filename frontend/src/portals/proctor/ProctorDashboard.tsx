@@ -7,6 +7,7 @@ import { useToast } from "../../components/Toast";
 import { Modal } from "../../components/Modal";
 import { Avatar, Badge, Button, Card, CardHeader, EmptyState, Input, Label, ResponsiveTable, SkeletonAvatarRows, StatTile, Textarea } from "../../components/ui";
 import { DashboardHero } from "../../components/DashboardHero";
+import { isEmptyHtml, RichTextEditor } from "../../components/RichTextEditor";
 
 interface StudentRow {
   usn: string;
@@ -56,6 +57,7 @@ export default function ProctorDashboard() {
   const [bulkDate, setBulkDate] = useState("");
   const [bulkTime, setBulkTime] = useState("");
   const [bulkText, setBulkText] = useState("");
+  const [bulkEditorKey, setBulkEditorKey] = useState(0);
   const [bulkBusy, setBulkBusy] = useState(false);
 
   function load() {
@@ -94,13 +96,14 @@ export default function ProctorDashboard() {
     setBulkDate("");
     setBulkTime("");
     setBulkText("");
+    setBulkEditorKey((k) => k + 1);
   }
 
   async function submitBulkPtm(e: FormEvent) {
     e.preventDefault();
     setBulkBusy(true);
     try {
-      const res = await api.post("/ptm/bulk", { ptmDate: bulkDate, ptmTime: bulkTime, notes: bulkText || undefined, usns: [...selected] });
+      const res = await api.post("/ptm/bulk", { ptmDate: bulkDate, ptmTime: bulkTime, notes: isEmptyHtml(bulkText) ? undefined : bulkText, usns: [...selected] });
       toast.success(`PTM logged for ${res.created} student(s)`, res.skipped.length ? `${res.skipped.length} skipped.` : undefined);
       closeBulkModal();
       setSelected(new Set());
@@ -311,7 +314,7 @@ export default function ProctorDashboard() {
           </div>
           <div>
             <Label>Notes</Label>
-            <Textarea rows={3} value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder="Shared context for this meeting..." />
+            <RichTextEditor key={bulkEditorKey} content={bulkText} onChange={setBulkText} placeholder="Shared context for this meeting..." />
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <Button type="button" variant="secondary" onClick={closeBulkModal}>

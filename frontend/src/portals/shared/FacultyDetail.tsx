@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { AlertTriangle, Award, Building2, CalendarClock, FileSearch, GraduationCap, History, Mail, Phone, Users, XCircle } from "lucide-react";
-import { api } from "../../api/client";
+import { AlertTriangle, Award, Building2, CalendarClock, Download, Eye, FileSearch, GraduationCap, History, Mail, Phone, Trash2, Users, UserRound, XCircle } from "lucide-react";
+import { api, ApiError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
-import { Avatar, Badge, Breadcrumb, Card, CardHeader, EmptyState, MobileListRow, PageSpinner, ResponsiveTable, StatTile } from "../../components/ui";
+import { useToast } from "../../components/Toast";
+import { Avatar, Badge, Breadcrumb, Card, CardHeader, EmptyState, IconButton, MobileListRow, PageSpinner, ResponsiveTable, StatTile } from "../../components/ui";
+import { ConfirmModal } from "../../components/Modal";
 
 interface Faculty {
   facultyId: number;
@@ -37,6 +39,7 @@ interface Ptm {
   ptmTime: string;
   notes: string | null;
   usn: string | null;
+  student: { name: string; usn: string; section: string | null } | null;
 }
 interface ImportBatch {
   batchId: number;
@@ -83,9 +86,13 @@ function InfoField({ icon: Icon, label, value }: { icon: typeof Mail; label: str
 export default function FacultyDetail({ base }: { base: string }) {
   const { id } = useParams<{ id: string }>();
   const { auth } = useAuth();
+  const toast = useToast();
   const [data, setData] = useState<Detail | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Ptm | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -105,10 +112,39 @@ export default function FacultyDetail({ base }: { base: string }) {
     api.get(`/proctors/${id}/analytics`).then(setAnalytics);
   }, [id, auth]);
 
+  async function downloadPtmPdf(ptmId: number) {
+    setDownloadingId(ptmId);
+    try {
+      const blob = await api.downloadPdf(`/ptm/${ptmId}/report`);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    } catch {
+      toast.error("Couldn't generate PDF", "Please try again.");
+    } finally {
+      setDownloadingId(null);
+    }
+  }
+
+  async function confirmDeletePtm() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/ptm/${deleteTarget.ptmId}`);
+      toast.success("PTM record deleted");
+      setDeleteTarget(null);
+      setData((prev) => (prev ? { ...prev, ptmRecords: prev.ptmRecords.filter((p) => p.ptmId !== deleteTarget.ptmId) } : prev));
+    } catch (err) {
+      toast.error("Couldn't delete", err instanceof ApiError ? err.message : "Please try again.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   if (error) return <EmptyState message={error} />;
   if (!data) return <PageSpinner />;
 
   const { faculty, proctees, ptmRecords, claimsReviewed, importBatches } = data;
+  const canDeletePtm = auth?.role === "ADMIN" || (auth?.role === "PROCTOR" && "facultyId" in auth.profile && auth.profile.facultyId === faculty.facultyId);
 
   return (
     <div className="space-y-6">
@@ -242,12 +278,23 @@ export default function FacultyDetail({ base }: { base: string }) {
           ) : (
             <ul className="divide-y divide-slate-100">
               {ptmRecords.map((p) => (
-                <li key={p.ptmId} className="px-5 py-3 text-sm">
-                  <div className="font-medium text-slate-800">
-                    {p.ptmDate} at {p.ptmTime}
-                    {p.usn && <span className="ml-2 font-mono text-xs text-slate-400">({p.usn})</span>}
+                <li key={p.ptmId} className="flex items-center gap-3 px-5 py-3 text-sm">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 font-medium text-slate-800">
+                      <UserRound className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                      <span className="truncate">{p.student ? `${p.student.name} (${p.student.usn})` : "General meeting"}</span>
+                    </div>
+                    <div className="mt-0.5 text-xs text-slate-400">
+                      {p.ptmDate} at {p.ptmTime}
+                    </div>
                   </div>
-                  {p.notes && <div className="mt-0.5 text-slate-500">{p.notes}</div>}
+                  <div className="flex shrink-0 items-center gap-1">
+                    <a href={`/ptm/${p.ptmId}`} target="_blank" rel="noreferrer">
+                      <IconButton icon={Eye} label="View PTM record" size="sm" />
+                    </a>
+                    <IconButton icon={Download} label="Download PDF" size="sm" onClick={() => downloadPtmPdf(p.ptmId)} disabled={downloadingId === p.ptmId} />
+                    {canDeletePtm && <IconButton icon={Trash2} label="Delete PTM record" size="sm" tone="danger" onClick={() => setDeleteTarget(p)} />}
+                  </div>
                 </li>
               ))}
             </ul>
@@ -342,6 +389,19 @@ export default function FacultyDetail({ base }: { base: string }) {
           />
         )}
       </Card>
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title="Delete PTM record?"
+        description={`This permanently removes the ${deleteTarget?.ptmDate ?? ""} record${
+          deleteTarget?.student ? ` for ${deleteTarget.student.name}` : ""
+        }, including its notes. This can't be undone.`}
+        confirmLabel="Delete"
+        tone="danger"
+        busy={deleting}
+        onConfirm={confirmDeletePtm}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

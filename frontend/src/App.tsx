@@ -17,6 +17,8 @@ import {
   History,
   CalendarCheck,
   Sparkles,
+  MessageSquare,
+  Megaphone,
 } from "lucide-react";
 import { useAuth } from "./auth/AuthContext";
 import Login from "./auth/Login";
@@ -49,6 +51,10 @@ import StudentDetail from "./portals/shared/StudentDetail";
 import FacultyDetail from "./portals/shared/FacultyDetail";
 import ScanImport from "./portals/shared/ScanImport";
 import AccoladesFeed from "./portals/shared/AccoladesFeed";
+import PtmDocument from "./portals/shared/PtmDocument";
+import Messages from "./portals/shared/Messages";
+import Circulars from "./portals/shared/Circulars";
+import MarkRequestsStudent from "./portals/student/MarkRequestsStudent";
 
 const adminTabs = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard },
@@ -62,6 +68,8 @@ const adminTabs = [
   { to: "/admin/workload", label: "Workload", icon: Scale },
   { to: "/admin/activity-points", label: "Activity Points", icon: Award },
   { to: "/admin/accolades", label: "Accolades", icon: Sparkles },
+  { to: "/admin/messages", label: "Messages", icon: MessageSquare },
+  { to: "/admin/circulars", label: "Circulars", icon: Megaphone },
   { to: "/admin/audit-log", label: "Audit Log", icon: History },
 ];
 
@@ -73,6 +81,8 @@ const proctorTabs = [
   { to: "/proctor/calendar", label: "Calendar / PTM", icon: CalendarDays },
   { to: "/proctor/attendance", label: "Attendance", icon: CalendarCheck },
   { to: "/proctor/activity-points", label: "Activity Points", icon: Award },
+  { to: "/proctor/messages", label: "Messages", icon: MessageSquare },
+  { to: "/proctor/circulars", label: "Circulars", icon: Megaphone },
   { to: "/proctor/accolades", label: "Accolades", icon: Sparkles },
 ];
 
@@ -80,6 +90,7 @@ const studentTabs = [
   { to: "/student", label: "Dashboard", icon: LayoutDashboard },
   { to: "/student/academic-record", label: "Academic Record", icon: BookOpen },
   { to: "/student/activity-points", label: "Activity Points", icon: Award },
+  { to: "/student/mark-requests", label: "Re-Eval", icon: FileSpreadsheet },
   { to: "/student/accolades", label: "Accolades", icon: Sparkles },
   { to: "/student/my-info", label: "My Info", icon: IdCard },
 ];
@@ -108,6 +119,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={auth ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/" element={<HomeRedirect />} />
+      <Route path="/ptm/:id" element={<PtmDocument />} />
 
       <Route
         path="/admin"
@@ -130,6 +142,8 @@ export default function App() {
         <Route path="analytics" element={<AdminAnalytics />} />
         <Route path="activity-points" element={<AdminActivityPoints />} />
         <Route path="accolades" element={<AccoladesFeed base="/admin" />} />
+        <Route path="messages" element={<Messages />} />
+        <Route path="circulars" element={<Circulars />} />
         <Route path="audit-log" element={<AuditLog />} />
       </Route>
 
@@ -148,6 +162,8 @@ export default function App() {
         <Route path="calendar" element={<Calendar />} />
         <Route path="attendance" element={<AttendanceMark />} />
         <Route path="activity-points" element={<ActivityPointsReview />} />
+        <Route path="messages" element={<Messages />} />
+        <Route path="circulars" element={<Circulars />} />
         <Route path="accolades" element={<AccoladesFeed base="/proctor" />} />
         <Route path="faculty/:id" element={<FacultyDetail base="/proctor" />} />
         <Route path="students/:usn" element={<StudentDetail base="/proctor" />} />
@@ -164,6 +180,7 @@ export default function App() {
         <Route index element={<StudentDashboard />} />
         <Route path="academic-record" element={<AcademicRecord />} />
         <Route path="activity-points" element={<ActivityPointsStudent />} />
+        <Route path="mark-requests" element={<MarkRequestsStudent />} />
         <Route path="accolades" element={<Accolades />} />
         <Route path="my-info" element={<MyInfo />} />
       </Route>

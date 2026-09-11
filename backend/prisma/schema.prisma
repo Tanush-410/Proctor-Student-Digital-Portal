@@ -41,7 +41,14 @@ model Faculty {
   notesAuthored   StudentNote[]
   auditLogs       AuditLog[]
   notifications   Notification[]
-  attendanceMarked AttendanceRecord[] @relation("AttendanceMarker")
+  attendanceMarked     AttendanceRecord[] @relation("AttendanceMarker")
+  messagesSent         Message[]          @relation("MessageSender")
+  messagesReceived     Message[]          @relation("MessageRecipient")
+  markRequestsReviewed MarkRequest[]      @relation("MarkRequestReviewer")
+  markRequestsAsProctor MarkRequest[]     @relation("MarkRequestProctor")
+  circularsSent        Circular[]
+  circularsReceived    CircularRecipient[]
+  subjectAttendanceUploaded SubjectAttendance[]
 
   @@map("faculty")
 }
@@ -85,13 +92,15 @@ model Student {
   localGuardianPhone String?  @map("local_guardian_phone")
   email                String   @unique
 
-  proctor    Faculty?             @relation("ProctorStudents", fields: [proctorId], references: [facultyId])
-  results    ResultRecord[]
-  claims     ActivityPointClaim[]
-  ptmRecords PtmRecord[]
-  notes      StudentNote[]
-  attendance AttendanceRecord[]
-  accolades  Accolade[]
+  proctor      Faculty?             @relation("ProctorStudents", fields: [proctorId], references: [facultyId])
+  results      ResultRecord[]
+  claims       ActivityPointClaim[]
+  ptmRecords   PtmRecord[]
+  notes        StudentNote[]
+  attendance   AttendanceRecord[]
+  accolades    Accolade[]
+  markRequests      MarkRequest[]
+  subjectAttendance SubjectAttendance[]
 
   @@map("student")
 }
@@ -150,6 +159,9 @@ model PtmRecord {
   ptmDate   String   @map("ptm_date")
   ptmTime   String   @map("ptm_time")
   notes     String?
+  // When the record itself was written — distinct from ptmDate/ptmTime, which
+  // is the meeting's own date/time and can be backfilled for a past meeting.
+  createdAt DateTime @default(now()) @map("created_at")
 
   proctor Faculty  @relation(fields: [proctorId], references: [facultyId])
   student Student? @relation(fields: [usn], references: [usn])
@@ -298,4 +310,127 @@ model Session {
   expiresAt DateTime @map("expires_at")
 
   @@map("session")
+}
+
+// Direct messages between any two Faculty members (proctor <-> proctor,
+// proctor <-> HOD/admin) — a lightweight inbox, not a full chat system: a
+// flat list of messages, threaded on the frontend by the (sender, recipient)
+// pair rather than a separate Conversation table.
+model Message {
+  id          Int      @id @default(autoincrement())
+  senderId    Int      @map("sender_id")
+  recipientId Int      @map("recipient_id")
+  body        String
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  sender    Faculty @relation("MessageSender", fields: [senderId], references: [facultyId])
+  recipient Faculty @relation("MessageRecipient", fields: [recipientId], references: [facultyId])
+
+  @@index([senderId, recipientId])
+  @@index([recipientId, read])
+  @@map("message")
+}
+
+// A student's request to have one subject's mark re-examined — either a
+// formal REVALUATION application (the college re-checks the answer script;
+// the student doesn't propose a value) or a CORRECTION claim (the student
+// believes the entered mark is simply wrong and states what they think it
+// should be), each with optional proof (a photo of the grade card/answer
+// script, etc. — same proof-upload mechanism as ActivityPointClaim).
+// Reviewed by the student's proctor or an admin; approval writes a *new*
+// ResultRecord (sourceType CHALLENGE_REVAL, the highest-precedence tier)
+// rather than mutating the disputed row, preserving the append-only
+// guarantee the rest of the results system relies on — the old mark stays
+// visible in history, just no longer effective.
+model MarkRequest {
+  id            Int       @id @default(autoincrement())
+  usn           String
+  // Snapshot of the student's proctor at submission time (same pattern as
+  // ActivityPointClaim.proctorId) — scopes a proctor's review queue without
+  // a live join, and stays stable even if the student is later reassigned.
+  proctorId     Int?      @map("proctor_id")
+  subjectCode   String    @map("subject_code")
+  subjectName   String?   @map("subject_name")
+  semester      Int
+  requestType   String    @map("request_type") // REVALUATION | CORRECTION
+  // Required for CORRECTION (the student's case for why the mark is wrong);
+  // not collected for REVALUATION, which is now just an applied/not-applied
+  // marker — the college's external process decides the outcome, not this app.
+  reason        String?
+  proposedTotal Int?      @map("proposed_total")
+  proposedGrade String?   @map("proposed_grade")
+  proofFile     String?   @map("proof_file")
+  status        String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  remarks       String?
+  reviewedBy    Int?      @map("reviewed_by")
+  submittedAt   DateTime  @default(now()) @map("submitted_at")
+  reviewedAt    DateTime? @map("reviewed_at")
+
+  student  Student  @relation(fields: [usn], references: [usn])
+  proctor  Faculty? @relation("MarkRequestProctor", fields: [proctorId], references: [facultyId])
+  reviewer Faculty? @relation("MarkRequestReviewer", fields: [reviewedBy], references: [facultyId])
+
+  @@index([usn])
+  @@index([proctorId, status])
+  @@map("mark_request")
+}
+
+// A one-to-many notice from the HOD to selected proctors — either authored
+// inline (rich-text `body`, rendered to a watermarked PDF on demand, same
+// engine as a PTM record) or an uploaded PDF/Word file (`fileUrl`). Exactly
+// one of body/fileUrl is set per circular. Per-recipient read tracking lives
+// in CircularRecipient rather than reusing Notification, since a circular is
+// a first-class document with its own detail view, not just an alert.
+model Circular {
+  id        Int      @id @default(autoincrement())
+  title     String
+  body      String?
+  fileUrl   String?  @map("file_url")
+  fileName  String?  @map("file_name")
+  senderId  Int      @map("sender_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  sender     Faculty             @relation(fields: [senderId], references: [facultyId])
+  recipients CircularRecipient[]
+
+  @@map("circular")
+}
+
+model CircularRecipient {
+  id         Int       @id @default(autoincrement())
+  circularId Int       @map("circular_id")
+  facultyId  Int       @map("faculty_id")
+  read       Boolean   @default(false)
+  readAt     DateTime? @map("read_at")
+
+  circular Circular @relation(fields: [circularId], references: [id], onDelete: Cascade)
+  faculty  Faculty  @relation(fields: [facultyId], references: [facultyId])
+
+  @@unique([circularId, facultyId])
+  @@map("circular_recipient")
+}
+
+// Per-subject attendance — separate from AttendanceRecord's day-by-day
+// marking (which a proctor does themselves, e.g. a homeroom-style roll
+// call). A proctor doesn't teach their proctees' individual subjects, so
+// subject-wise attendance is entered by an Admin from what subject faculty
+// report elsewhere; proctors only ever view it (Section 9 access matrix).
+model SubjectAttendance {
+  id              Int      @id @default(autoincrement())
+  usn             String
+  subjectCode     String   @map("subject_code")
+  subjectName     String?  @map("subject_name")
+  semester        Int
+  totalClasses    Int      @map("total_classes")
+  attendedClasses Int      @map("attended_classes")
+  uploadedBy      Int?     @map("uploaded_by")
+  uploadedAt      DateTime @default(now()) @map("uploaded_at")
+
+  student  Student  @relation(fields: [usn], references: [usn])
+  uploader Faculty? @relation(fields: [uploadedBy], references: [facultyId])
+
+  @@unique([usn, subjectCode, semester])
+  @@index([usn])
+  @@map("subject_attendance")
 }

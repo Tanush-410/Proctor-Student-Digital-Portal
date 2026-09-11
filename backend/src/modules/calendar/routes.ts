@@ -2,8 +2,18 @@ import { z } from "zod";
 import { prisma } from "../../db";
 import { AuthedRequest, requireAuth, requireRole } from "../../middleware/session";
 import { safeRouter } from "../../lib/asyncSafeRouter";
+import { logAudit } from "../../lib/audit";
+import { buildPtmRecordPdf } from "../reports/pdf";
 
 export const calendarRouter = safeRouter();
+
+/** Same read-access rule GET /ptm's list applies to one record: a student
+ * may only see their own, a proctor only their own log, admin sees all. */
+function canReadPtm(auth: AuthedRequest["auth"], record: { proctorId: number; usn: string | null }): boolean {
+  if (auth!.role === "ADMIN") return true;
+  if (auth!.role === "PROCTOR") return record.proctorId === auth!.facultyId;
+  return record.usn === auth!.usn;
+}
 
 const ptmSchema = z.object({
   ptmDate: z.string().min(1),
@@ -90,6 +100,60 @@ calendarRouter.get("/ptm", requireAuth, requireRole("ADMIN", "PROCTOR", "STUDENT
   const records = await prisma.ptmRecord.findMany({
     where: { ...(proctorId ? { proctorId } : {}), ...(usn ? { usn } : {}) },
     orderBy: { ptmDate: "desc" },
+    include: { proctor: { select: { name: true, shortCode: true } }, student: { select: { name: true, usn: true, section: true } } },
   });
   res.json(records);
+});
+
+// GET /ptm/:id — one record's full detail, for the standalone document view
+// and the PDF export. Joins in the proctor's and student's names so the
+// document doesn't need a second round-trip to render "Recorded by" / who
+// it's about.
+calendarRouter.get("/ptm/:id", requireAuth, requireRole("ADMIN", "PROCTOR", "STUDENT"), async (req: AuthedRequest, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid PTM id" });
+
+  const record = await prisma.ptmRecord.findUnique({
+    where: { ptmId: id },
+    include: { proctor: { select: { name: true, shortCode: true } }, student: { select: { name: true, usn: true, section: true } } },
+  });
+  if (!record) return res.status(404).json({ error: "PTM record not found" });
+  if (!canReadPtm(req.auth!, record)) return res.status(403).json({ error: "Not your PTM record to view" });
+
+  res.json(record);
+});
+
+// DELETE /ptm/:id — the owning proctor or an admin only. Not the student, and
+// not another proctor even if the record happens to be about their proctee
+// (it's the author's own log entry).
+calendarRouter.delete("/ptm/:id", requireAuth, requireRole("ADMIN", "PROCTOR"), async (req: AuthedRequest, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid PTM id" });
+
+  const record = await prisma.ptmRecord.findUnique({ where: { ptmId: id } });
+  if (!record) return res.status(404).json({ error: "PTM record not found" });
+  if (req.auth!.role !== "ADMIN" && record.proctorId !== req.auth!.facultyId) {
+    return res.status(403).json({ error: "You may only delete your own PTM records" });
+  }
+
+  await prisma.ptmRecord.delete({ where: { ptmId: id } });
+  logAudit(req, "DELETE", "PtmRecord", String(id), { usn: record.usn, ptmDate: record.ptmDate });
+  res.status(204).end();
+});
+
+// GET /ptm/:id/report — the same record as a downloadable PDF, with the same
+// big-crest watermark treatment as every other generated report.
+calendarRouter.get("/ptm/:id/report", requireAuth, requireRole("ADMIN", "PROCTOR", "STUDENT"), async (req: AuthedRequest, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: "Invalid PTM id" });
+
+  const record = await prisma.ptmRecord.findUnique({
+    where: { ptmId: id },
+    include: { proctor: { select: { name: true, shortCode: true } }, student: { select: { name: true, usn: true } } },
+  });
+  if (!record) return res.status(404).json({ error: "PTM record not found" });
+  if (!canReadPtm(req.auth!, record)) return res.status(403).json({ error: "Not your PTM record to download" });
+
+  logAudit(req, "EXPORT", "PtmRecord", String(id));
+  buildPtmRecordPdf(record, res);
 });

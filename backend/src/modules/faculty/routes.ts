@@ -52,7 +52,7 @@ facultyRouter.get("/proctors/:id", requireAuth, requireRole("ADMIN", "PROCTOR"),
 
   const [proctees, ptmRecords, claimsReviewed, importBatches] = await Promise.all([
     prisma.student.findMany({ where: { proctorId: id }, orderBy: { usn: "asc" } }),
-    prisma.ptmRecord.findMany({ where: { proctorId: id }, orderBy: { ptmDate: "desc" }, take: 10 }),
+    prisma.ptmRecord.findMany({ where: { proctorId: id }, orderBy: { ptmDate: "desc" }, take: 10, include: { student: { select: { name: true, usn: true, section: true } } } }),
     prisma.activityPointClaim.findMany({
       where: { proctorId: id, status: { not: "PENDING" } },
       orderBy: { reviewedAt: "desc" },
