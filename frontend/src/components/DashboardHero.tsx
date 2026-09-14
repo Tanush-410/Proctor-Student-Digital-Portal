@@ -21,7 +21,7 @@ export function DashboardHero({ eyebrow, title, subtitle, action }: { eyebrow?: 
         initial={{ opacity: 0, scale: 0.9, rotate: -6 }}
         animate={{ opacity: 0.14, scale: 1, rotate: 0 }}
         transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-        className="pointer-events-none absolute -bottom-16 -right-10 h-72 w-72 sm:h-96 sm:w-96"
+        className="pointer-events-none absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2 sm:h-64 sm:w-64"
       />
       <motion.div
         initial={{ opacity: 0, y: 10 }}

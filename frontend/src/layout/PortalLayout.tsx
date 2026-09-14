@@ -154,13 +154,15 @@ export default function PortalLayout({ tabs, portalName }: { tabs: Tab[]; portal
         {/* App-wide watermark — present behind every page, not just the
             dashboards, so the crest reads as this app's identity rather than
             a one-off homepage flourish. Fixed to the viewport (not the
-            scrolling content) and far enough back (very low opacity, behind
-            z-0 content) that it never competes with anything on top of it. */}
+            scrolling content), centered in the visible content area (offset
+            past the sidebar on large screens) and far enough back (very low
+            opacity, behind z-0 content) that it never competes with anything
+            on top of it — fully visible rather than bled off a corner. */}
         <img
           src="/bms-logo.svg"
           alt=""
           aria-hidden="true"
-          className="pointer-events-none fixed bottom-[-6vw] right-[-6vw] z-0 h-[45vw] w-[45vw] max-h-[560px] max-w-[560px] opacity-[0.035] lg:right-[-4vw]"
+          className="pointer-events-none fixed left-1/2 top-1/2 z-0 h-[34vw] w-[34vw] max-h-[440px] max-w-[440px] -translate-x-1/2 -translate-y-1/2 opacity-[0.035] lg:left-[calc(50%+8rem)]"
         />
         {auth.role !== "STUDENT" && (
           <div className="sticky top-0 z-20 hidden justify-between border-b border-slate-200/70 bg-white/70 px-4 py-2.5 backdrop-blur sm:px-6 lg:flex lg:px-8">
