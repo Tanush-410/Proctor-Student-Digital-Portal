@@ -1,10 +1,19 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
-import { MessageSquare, Search, Send, X } from "lucide-react";
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
+import { Download, FileText, MessageSquare, Paperclip, Search, Send, X } from "lucide-react";
 import { api, ApiError } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { useToast } from "../../components/Toast";
 import { Avatar, Badge, Card, EmptyState, PageSpinner } from "../../components/ui";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+
+const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
+const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 interface FacultyHit {
   facultyId: number;
@@ -24,7 +33,11 @@ interface Message {
   id: number;
   senderId: number;
   recipientId: number;
-  body: string;
+  body: string | null;
+  attachmentUrl: string | null;
+  attachmentName: string | null;
+  attachmentType: string | null;
+  attachmentSize: number | null;
   read: boolean;
   createdAt: string;
 }
@@ -52,6 +65,9 @@ export default function Messages() {
   const [messages, setMessages] = useState<Message[] | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [searching, setSearching] = useState(false);
   const [q, setQ] = useState("");
@@ -72,6 +88,8 @@ export default function Messages() {
     setSearching(false);
     setQ("");
     setMessages(null);
+    setDraft("");
+    clearAttachment();
     api.get(`/messages/with/${f.facultyId}`).then((r) => {
       setActiveWith(r.with);
       setMessages(r.messages);
@@ -91,13 +109,40 @@ export default function Messages() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
+  // Revoke the object URL for the picked-file preview once it's no longer shown.
+  useEffect(() => () => { if (attachmentPreviewUrl) URL.revokeObjectURL(attachmentPreviewUrl); }, [attachmentPreviewUrl]);
+
+  function pickAttachment(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow picking the same file again later
+    if (!file) return;
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      toast.error("File too large", "Attachments are limited to 15 MB.");
+      return;
+    }
+    if (attachmentPreviewUrl) URL.revokeObjectURL(attachmentPreviewUrl);
+    setAttachment(file);
+    setAttachmentPreviewUrl(IMAGE_TYPES.has(file.type) ? URL.createObjectURL(file) : null);
+  }
+
+  function clearAttachment() {
+    if (attachmentPreviewUrl) URL.revokeObjectURL(attachmentPreviewUrl);
+    setAttachment(null);
+    setAttachmentPreviewUrl(null);
+  }
+
   async function send(e: FormEvent) {
     e.preventDefault();
-    if (!activeId || !draft.trim()) return;
+    if (!activeId || (!draft.trim() && !attachment)) return;
     setSending(true);
     try {
-      await api.post("/messages", { recipientId: activeId, body: draft.trim() });
+      const form = new FormData();
+      form.append("recipientId", String(activeId));
+      if (draft.trim()) form.append("body", draft.trim());
+      if (attachment) form.append("attachment", attachment);
+      await api.upload("/messages", form);
       setDraft("");
+      clearAttachment();
       const r = await api.get(`/messages/with/${activeId}`);
       setMessages(r.messages);
       loadThreads();
@@ -219,10 +264,31 @@ export default function Messages() {
                   ) : (
                     messages.map((m) => {
                       const mine = m.senderId === me;
+                      const isImage = m.attachmentType ? IMAGE_TYPES.has(m.attachmentType) : false;
                       return (
                         <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                           <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 text-sm ${mine ? "rounded-br-sm bg-brand-600 text-white" : "rounded-bl-sm bg-slate-100 text-slate-800"}`}>
-                            <div className="whitespace-pre-wrap break-words">{m.body}</div>
+                            {m.attachmentUrl && isImage && (
+                              <a href={api.fileUrl(m.attachmentUrl)} target="_blank" rel="noreferrer" className="mb-1.5 block overflow-hidden rounded-lg">
+                                <img src={api.fileUrl(m.attachmentUrl)} alt={m.attachmentName ?? "attachment"} className="max-h-64 w-full object-cover" />
+                              </a>
+                            )}
+                            {m.attachmentUrl && !isImage && (
+                              <a
+                                href={api.fileUrl(m.attachmentUrl)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={`mb-1.5 flex items-center gap-2 rounded-lg border px-2.5 py-2 ${mine ? "border-brand-400/50 bg-brand-500/30 hover:bg-brand-500/40" : "border-slate-200 bg-white hover:bg-slate-50"}`}
+                              >
+                                <FileText className={`h-4 w-4 shrink-0 ${mine ? "text-white" : "text-slate-500"}`} />
+                                <div className="min-w-0 flex-1">
+                                  <div className="truncate text-xs font-medium">{m.attachmentName ?? "Attachment"}</div>
+                                  {m.attachmentSize != null && <div className={`text-[10px] ${mine ? "text-brand-100" : "text-slate-400"}`}>{formatBytes(m.attachmentSize)}</div>}
+                                </div>
+                                <Download className={`h-3.5 w-3.5 shrink-0 ${mine ? "text-white" : "text-slate-400"}`} />
+                              </a>
+                            )}
+                            {m.body && <div className="whitespace-pre-wrap break-words">{m.body}</div>}
                             <div className={`mt-1 text-right text-[10px] ${mine ? "text-brand-100" : "text-slate-400"}`}>{timeAgo(m.createdAt)}</div>
                           </div>
                         </div>
@@ -231,22 +297,52 @@ export default function Messages() {
                   )}
                 </div>
 
-                <form onSubmit={send} className="flex items-center gap-2 border-t border-slate-100 px-4 py-3">
-                  <input
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    placeholder="Write a message..."
-                    className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10"
-                  />
-                  <button
-                    type="submit"
-                    disabled={sending || !draft.trim()}
-                    aria-label="Send"
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-white transition-colors hover:bg-brand-700 disabled:opacity-40"
-                  >
-                    <Send className="h-4 w-4" />
-                  </button>
-                </form>
+                <div className="border-t border-slate-100">
+                  {attachment && (
+                    <div className="flex items-center gap-2.5 border-b border-slate-100 bg-slate-50 px-4 py-2.5">
+                      {attachmentPreviewUrl ? (
+                        <img src={attachmentPreviewUrl} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" />
+                      ) : (
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-slate-200">
+                          <FileText className="h-4 w-4 text-slate-500" />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-xs font-medium text-slate-700">{attachment.name}</div>
+                        <div className="text-[10px] text-slate-400">{formatBytes(attachment.size)}</div>
+                      </div>
+                      <button type="button" onClick={clearAttachment} className="rounded-lg p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600" aria-label="Remove attachment">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                  <form onSubmit={send} className="flex items-center gap-2 px-4 py-3">
+                    <input ref={fileInputRef} type="file" onChange={pickAttachment} className="hidden" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.zip" />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      aria-label="Attach a file"
+                      title="Attach a file"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                    >
+                      <Paperclip className="h-4 w-4" />
+                    </button>
+                    <input
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      placeholder="Write a message..."
+                      className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10"
+                    />
+                    <button
+                      type="submit"
+                      disabled={sending || (!draft.trim() && !attachment)}
+                      aria-label="Send"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-white transition-colors hover:bg-brand-700 disabled:opacity-40"
+                    >
+                      <Send className="h-4 w-4" />
+                    </button>
+                  </form>
+                </div>
               </>
             )}
           </div>

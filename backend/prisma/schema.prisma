@@ -320,7 +320,15 @@ model Message {
   id          Int      @id @default(autoincrement())
   senderId    Int      @map("sender_id")
   recipientId Int      @map("recipient_id")
-  body        String
+  body        String?
+  // A message is either text, an attachment, or both (WhatsApp-style — you
+  // can send a photo with no caption) — enforced in the route, not here,
+  // since Postgres has no clean single-column "at least one of" check
+  // across nullable text + nullable attachment fields.
+  attachmentUrl  String? @map("attachment_url")
+  attachmentName String? @map("attachment_name")
+  attachmentType String? @map("attachment_type")
+  attachmentSize Int?    @map("attachment_size")
   read        Boolean  @default(false)
   createdAt   DateTime @default(now()) @map("created_at")
 
