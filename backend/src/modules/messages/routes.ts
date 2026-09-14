@@ -152,7 +152,7 @@ messagesRouter.post("/messages", requireAuth, requireRole("ADMIN", "PROCTOR"), u
 // activity-point proof files: activityPoints/routes.ts). Forced to download
 // rather than render inline, regardless of what content type sneaks past the
 // upload-time whitelist.
-messagesRouter.get("/messages/uploads/:filename", requireAuth, requireRole("ADMIN", "PROCTOR"), async (req: AuthedRequest, res) => {
+messagesRouter.get("/uploads/messages/:filename", requireAuth, requireRole("ADMIN", "PROCTOR"), async (req: AuthedRequest, res) => {
   const { filename } = req.params;
   if (!/^[a-f0-9]{32}\.\w{1,5}$/i.test(filename)) {
     return res.status(400).json({ error: "Invalid filename" });
