@@ -4,17 +4,23 @@ import { APP_URL } from "./config";
 export const isProduction = process.env.NODE_ENV === "production";
 
 /**
- * Two ways out of the box, picked in this order:
+ * Three ways out of the box, picked in this order:
  *
- *  1. Brevo's HTTP API (BREVO_API_KEY) — plain HTTPS on :443. This is the one
- *     that works on a Render free web service, which blocks outbound traffic
- *     to SMTP ports 25/465/587 entirely (a connection there doesn't get
- *     refused, it hangs until the socket times out).
- *  2. Plain SMTP (SMTP_HOST/PORT/USER/PASS) — for local development, and for
- *     any host that doesn't block those ports.
+ *  1. Mailjet's HTTP API (MAILJET_API_KEY + MAILJET_SECRET_KEY)
+ *  2. Brevo's HTTP API   (BREVO_API_KEY)
+ *  3. Plain SMTP         (SMTP_HOST/PORT/USER/PASS)
  *
- * Both are optional: with neither configured, every send is a no-op that
- * returns false, exactly as before.
+ * The HTTP ones exist because a Render free web service blocks outbound
+ * traffic to SMTP ports 25/465/587 entirely — a connection there isn't
+ * refused, it hangs until the socket times out, which surfaces as a login
+ * page stuck on "Sending…". Both APIs are ordinary HTTPS on :443.
+ *
+ * SMTP stays as the local-development path (and works on any host that
+ * doesn't block those ports). All three are optional: with none configured
+ * every send is a no-op returning false, exactly as before.
+ *
+ * The sender address must be one the provider has verified. On both Mailjet
+ * and Brevo a single address can be verified on its own, without a domain.
  */
 
 // ── shared ────────────────────────────────────────────────────────────────
@@ -29,15 +35,94 @@ function parseFrom(raw: string | undefined): { name: string; email: string } | n
   return { name: "Proctor Diary", email: raw.trim() };
 }
 
+/** The verified sender, however it happens to be configured. */
 function sender(): { name: string; email: string } | null {
-  const explicit = process.env.BREVO_SENDER_EMAIL?.trim();
+  const explicit =
+    process.env.MAIL_SENDER_EMAIL?.trim() ||
+    process.env.MAILJET_SENDER_EMAIL?.trim() ||
+    process.env.BREVO_SENDER_EMAIL?.trim();
   if (explicit) {
-    return { name: process.env.BREVO_SENDER_NAME?.trim() || "Proctor Diary", email: explicit };
+    const name =
+      process.env.MAIL_SENDER_NAME?.trim() ||
+      process.env.MAILJET_SENDER_NAME?.trim() ||
+      process.env.BREVO_SENDER_NAME?.trim() ||
+      "Proctor Diary";
+    return { name, email: explicit };
   }
   return parseFrom(process.env.SMTP_FROM || process.env.SMTP_USER);
 }
 
-// ── transport 1: Brevo HTTP API ───────────────────────────────────────────
+/**
+ * Without a timeout a stalled connection would hold the caller's HTTP request
+ * open (the login page sitting on "Sending…").
+ */
+const HTTP_TIMEOUT_MS = 15_000;
+
+// ── transport 1: Mailjet Send API v3.1 ────────────────────────────────────
+
+const MAILJET_ENDPOINT = "https://api.mailjet.com/v3.1/send";
+
+async function sendViaMailjet(mail: Mail): Promise<boolean> {
+  const key = process.env.MAILJET_API_KEY?.trim();
+  const secret = process.env.MAILJET_SECRET_KEY?.trim();
+  if (!key || !secret) return false;
+
+  const from = sender();
+  if (!from) {
+    console.error("[mailer] Mailjet keys are set but no sender address — set MAIL_SENDER_EMAIL.");
+    return false;
+  }
+
+  try {
+    const res = await fetch(MAILJET_ENDPOINT, {
+      method: "POST",
+      headers: {
+        // Mailjet authenticates with HTTP Basic: public key as the user,
+        // private key as the password.
+        authorization: "Basic " + Buffer.from(`${key}:${secret}`).toString("base64"),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        Messages: [
+          {
+            From: { Email: from.email, Name: from.name },
+            To: [{ Email: mail.to }],
+            Subject: mail.subject,
+            TextPart: mail.text,
+            HTMLPart: mail.html,
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
+    });
+
+    const bodyText = await res.text().catch(() => "");
+
+    if (!res.ok) {
+      console.error(`[mailer] Mailjet rejected the send (HTTP ${res.status}): ${bodyText}`);
+      return false;
+    }
+
+    // v3.1 answers 200 even when an individual message failed — the per-message
+    // Status is the thing that actually says whether it went out.
+    try {
+      const parsed = JSON.parse(bodyText) as { Messages?: Array<{ Status?: string }> };
+      const status = parsed.Messages?.[0]?.Status;
+      if (status && status !== "success") {
+        console.error(`[mailer] Mailjet returned status "${status}": ${bodyText}`);
+        return false;
+      }
+    } catch {
+      // Unparseable body on a 200 — treat as sent rather than retrying blindly.
+    }
+    return true;
+  } catch (err) {
+    console.error("[mailer] Mailjet request failed:", err);
+    return false;
+  }
+}
+
+// ── transport 2: Brevo HTTP API ───────────────────────────────────────────
 
 const BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email";
 
@@ -47,13 +132,11 @@ async function sendViaBrevo(mail: Mail): Promise<boolean> {
 
   const from = sender();
   if (!from) {
-    console.error("[mailer] BREVO_API_KEY is set but no sender address — set BREVO_SENDER_EMAIL or SMTP_FROM.");
+    console.error("[mailer] BREVO_API_KEY is set but no sender address — set MAIL_SENDER_EMAIL.");
     return false;
   }
 
   try {
-    // Without a timeout a stalled connection would hold the HTTP request open
-    // for the caller (the login page sitting on "Sending…").
     const res = await fetch(BREVO_ENDPOINT, {
       method: "POST",
       headers: {
@@ -68,11 +151,10 @@ async function sendViaBrevo(mail: Mail): Promise<boolean> {
         htmlContent: mail.html,
         textContent: mail.text,
       }),
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
     });
 
     if (!res.ok) {
-      // Brevo puts the useful part ({"code":"...","message":"..."}) in the body.
       const detail = await res.text().catch(() => "");
       console.error(`[mailer] Brevo rejected the send (HTTP ${res.status}): ${detail}`);
       return false;
@@ -84,7 +166,7 @@ async function sendViaBrevo(mail: Mail): Promise<boolean> {
   }
 }
 
-// ── transport 2: SMTP ─────────────────────────────────────────────────────
+// ── transport 3: SMTP ─────────────────────────────────────────────────────
 
 let transporter: Transporter | null = null;
 let configured = false;
@@ -129,8 +211,11 @@ async function sendViaSmtp(mail: Mail): Promise<boolean> {
   }
 }
 
-/** Brevo first, SMTP as the fallback; false when neither is configured. */
+/** First configured transport wins; false when none is configured. */
 async function send(mail: Mail): Promise<boolean> {
+  if (process.env.MAILJET_API_KEY?.trim() && process.env.MAILJET_SECRET_KEY?.trim()) {
+    return sendViaMailjet(mail);
+  }
   if (process.env.BREVO_API_KEY?.trim()) {
     return sendViaBrevo(mail);
   }
