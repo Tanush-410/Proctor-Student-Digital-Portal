@@ -12,6 +12,7 @@
     "seed": "tsx prisma/seedReal.ts",
     "seed:demo": "tsx prisma/seed.ts",
     "seed:build": "tsx prisma/data/buildCohort.ts",
+    "seed:export": "tsx prisma/exportCohort.ts",
     "bootstrap-admin": "node dist/scripts/bootstrapAdmin.js",
     "test": "bash scripts/test.sh",
     "seed:scale": "tsx prisma/seedScale.ts"
