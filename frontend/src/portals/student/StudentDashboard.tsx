@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Award, Building2, CalendarCheck, CalendarClock, CheckCircle2, GraduationCap, Phone, TrendingUp, Users, XCircle } from "lucide-react";
+import { Award, Building2, CalendarCheck, CalendarClock, CheckCircle2, Download, Eye, GraduationCap, Phone, TrendingUp, Users, XCircle } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { api } from "../../api/client";
-import { Avatar, Badge, Card, CardHeader, EmptyState, Skeleton, StatTile } from "../../components/ui";
+import { useToast } from "../../components/Toast";
+import { Avatar, Badge, Card, CardHeader, EmptyState, IconButton, Skeleton, StatTile } from "../../components/ui";
 import { BarChart, LineChart } from "../../components/charts";
 import { DashboardHero } from "../../components/DashboardHero";
 
@@ -38,7 +39,9 @@ interface AttendanceSummary {
 
 export default function StudentDashboard() {
   const { auth } = useAuth();
+  const toast = useToast();
   const usn = auth && "usn" in auth.profile ? auth.profile.usn : "";
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
   const [cgpa, setCgpa] = useState<number | null>(null);
   const [backlogs, setBacklogs] = useState<number | null>(null);
   const [sgpaBySemester, setSgpaBySemester] = useState<Record<string, number | null>>({});
@@ -69,6 +72,19 @@ export default function StudentDashboard() {
   const name = auth && "name" in auth.profile ? auth.profile.name : "";
   const firstName = name.split(" ")[0];
 
+  async function downloadPtmPdf(id: number) {
+    setDownloadingId(id);
+    try {
+      const blob = await api.downloadPdf(`/ptm/${id}/report`);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    } catch {
+      toast.error("Couldn't generate PDF", "Please try again.");
+    } finally {
+      setDownloadingId(null);
+    }
+  }
+
   const trendPoints = Object.entries(sgpaBySemester)
     .filter(([, v]) => v !== null)
     .sort(([a], [b]) => Number(a) - Number(b))
@@ -83,10 +99,10 @@ export default function StudentDashboard() {
       />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatTile label="CGPA" value={cgpa ?? "N/A"} tone="blue" icon={GraduationCap} loading={cgpa === null} />
-        <StatTile label="Backlog Subjects" value={backlogs ?? 0} tone={backlogs ? "red" : "green"} icon={backlogs ? XCircle : CheckCircle2} loading={backlogs === null} />
-        <StatTile label="Activity Points" value={points ?? 0} tone="amber" icon={Award} loading={points === null} />
-        <StatTile
+        <StatTile index={0} label="CGPA" value={cgpa ?? "N/A"} tone="blue" icon={GraduationCap} loading={cgpa === null} />
+        <StatTile index={1} label="Backlog Subjects" value={backlogs ?? 0} tone={backlogs ? "red" : "green"} icon={backlogs ? XCircle : CheckCircle2} loading={backlogs === null} />
+        <StatTile index={2} label="Activity Points" value={points ?? 0} tone="amber" icon={Award} loading={points === null} />
+        <StatTile index={3}
           label="Attendance"
           value={attendance?.percentage !== null && attendance?.percentage !== undefined ? `${attendance.percentage}%` : "N/A"}
           tone={attendance?.percentage !== null && attendance !== null && attendance.percentage! < 75 ? "red" : "green"}
@@ -188,11 +204,16 @@ export default function StudentDashboard() {
           ) : (
             <ul className="divide-y divide-slate-100">
               {ptms.map((p) => (
-                <li key={p.ptmId} className="px-5 py-3 text-sm">
-                  <div className="font-medium text-slate-800">
+                <li key={p.ptmId} className="flex items-center gap-3 px-5 py-3 text-sm">
+                  <div className="min-w-0 flex-1 font-medium text-slate-800">
                     {new Date(p.ptmDate + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} at {p.ptmTime}
                   </div>
-                  {p.notes && <div className="mt-0.5 text-slate-500">{p.notes}</div>}
+                  <div className="flex shrink-0 items-center gap-1">
+                    <a href={`/ptm/${p.ptmId}`} target="_blank" rel="noreferrer">
+                      <IconButton icon={Eye} label="View PTM record" size="sm" />
+                    </a>
+                    <IconButton icon={Download} label="Download PDF" size="sm" onClick={() => downloadPtmPdf(p.ptmId)} disabled={downloadingId === p.ptmId} />
+                  </div>
                 </li>
               ))}
             </ul>

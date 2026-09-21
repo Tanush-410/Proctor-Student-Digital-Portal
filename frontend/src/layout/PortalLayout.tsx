@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import { LogOut, Menu, Search, X, type LucideIcon } from "lucide-react";
 import { useAuth } from "../auth/AuthContext";
 import { Avatar, Badge } from "../components/ui";
@@ -16,6 +17,7 @@ export default function PortalLayout({ tabs, portalName }: { tabs: Tab[]; portal
   const { auth, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const location = useLocation();
   useCommandPaletteShortcut(() => setPaletteOpen(true));
 
   useEffect(() => {
@@ -152,13 +154,15 @@ export default function PortalLayout({ tabs, portalName }: { tabs: Tab[]; portal
         {/* App-wide watermark — present behind every page, not just the
             dashboards, so the crest reads as this app's identity rather than
             a one-off homepage flourish. Fixed to the viewport (not the
-            scrolling content) and far enough back (very low opacity, behind
-            z-0 content) that it never competes with anything on top of it. */}
+            scrolling content), centered in the visible content area (offset
+            past the sidebar on large screens) and far enough back (very low
+            opacity, behind z-0 content) that it never competes with anything
+            on top of it — fully visible rather than bled off a corner. */}
         <img
           src="/bms-logo.svg"
           alt=""
           aria-hidden="true"
-          className="pointer-events-none fixed bottom-[-6vw] right-[-6vw] z-0 h-[45vw] w-[45vw] max-h-[560px] max-w-[560px] opacity-[0.035] lg:right-[-4vw]"
+          className="pointer-events-none fixed left-1/2 top-1/2 z-0 h-[34vw] w-[34vw] max-h-[440px] max-w-[440px] -translate-x-1/2 -translate-y-1/2 opacity-[0.035] lg:left-[calc(50%+8rem)]"
         />
         {auth.role !== "STUDENT" && (
           <div className="sticky top-0 z-20 hidden justify-between border-b border-slate-200/70 bg-white/70 px-4 py-2.5 backdrop-blur sm:px-6 lg:flex lg:px-8">
@@ -173,8 +177,18 @@ export default function PortalLayout({ tabs, portalName }: { tabs: Tab[]; portal
             <NotificationBell />
           </div>
         )}
-        <div className="animate-in relative z-10 mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-          <Outlet />
+        <div className="relative z-10 mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <Outlet />
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
 

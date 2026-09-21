@@ -5,6 +5,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "sans-serif"],
+        display: ["Lexend", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       colors: {
         // Anchored on BMSCE's crest blue (#00519C) at 600 — the shade every
@@ -44,5 +45,5 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [require("@tailwindcss/typography")],
 };

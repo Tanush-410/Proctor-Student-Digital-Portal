@@ -154,3 +154,59 @@ attendanceRouter.get("/admin/attendance/analytics", requireAuth, requireRole("AD
       .map(([section, b]) => ({ section, percentage: b.total > 0 ? Math.round((b.present / b.total) * 1000) / 10 : null, recordCount: b.total })),
   });
 });
+
+// ---------- per-subject attendance (view-only for a proctor — they don't
+// teach their proctees' individual subjects, so they never enter this) ----------
+
+const subjectAttendanceSchema = z.object({
+  usn: z.string().min(1),
+  subjectCode: z.string().trim().min(1),
+  subjectName: z.string().trim().optional(),
+  semester: z.number().int().min(1).max(8),
+  totalClasses: z.number().int().min(0).max(500),
+  attendedClasses: z.number().int().min(0).max(500),
+});
+
+// POST /subject-attendance — Admin enters (or corrects, via upsert on the
+// usn+subjectCode+semester key) what subject faculty reported. Not a
+// Proctor capability by design — see the access-matrix note above.
+attendanceRouter.post("/subject-attendance", requireAuth, requireRole("ADMIN"), async (req: AuthedRequest, res) => {
+  const parsed = subjectAttendanceSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  if (parsed.data.attendedClasses > parsed.data.totalClasses) {
+    return res.status(400).json({ error: "attendedClasses can't exceed totalClasses" });
+  }
+
+  const student = await prisma.student.findUnique({ where: { usn: parsed.data.usn } });
+  if (!student) return res.status(404).json({ error: "Student not found" });
+
+  const record = await prisma.subjectAttendance.upsert({
+    where: { usn_subjectCode_semester: { usn: parsed.data.usn, subjectCode: parsed.data.subjectCode, semester: parsed.data.semester } },
+    create: { ...parsed.data, uploadedBy: req.auth!.facultyId },
+    update: { totalClasses: parsed.data.totalClasses, attendedClasses: parsed.data.attendedClasses, subjectName: parsed.data.subjectName, uploadedBy: req.auth!.facultyId },
+  });
+
+  logAudit(req, "UPLOAD", "SubjectAttendance", `${parsed.data.usn}:${parsed.data.subjectCode}:${parsed.data.semester}`);
+  res.status(201).json(record);
+});
+
+// GET /students/:usn/subject-attendance — Admin/own-Proctor/own-Student,
+// same scoping rule as every other per-student endpoint in this module.
+attendanceRouter.get("/students/:usn/subject-attendance", requireAuth, requireRole("ADMIN", "PROCTOR", "STUDENT"), async (req: AuthedRequest, res) => {
+  const { usn } = req.params;
+  if (req.auth!.role === "STUDENT" && req.auth!.usn !== usn) {
+    return res.status(403).json({ error: "Students may only view their own attendance" });
+  }
+  if (req.auth!.role === "PROCTOR") {
+    const student = await prisma.student.findUnique({ where: { usn } });
+    if (!student || student.proctorId !== req.auth!.facultyId) return res.status(403).json({ error: "Not your proctee" });
+  }
+
+  const records = await prisma.subjectAttendance.findMany({ where: { usn }, orderBy: [{ semester: "desc" }, { subjectCode: "asc" }] });
+  res.json(
+    records.map((r) => ({
+      ...r,
+      percentage: r.totalClasses > 0 ? Math.round((r.attendedClasses / r.totalClasses) * 1000) / 10 : null,
+    }))
+  );
+});

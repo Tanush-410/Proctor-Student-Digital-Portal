@@ -39,10 +39,10 @@ export default function AdminWorkload() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatTile label="Proctors" value={data.proctors.length} icon={Users} />
-        <StatTile label="Average Load" value={data.avgLoad} tone="blue" icon={Scale} />
-        <StatTile label="Spread (min–max)" value={`${data.minLoad}–${data.maxLoad}`} tone={imbalanced ? "amber" : "green"} icon={Scale} />
-        <StatTile label="Unassigned Students" value={data.unassignedCount} tone={data.unassignedCount > 0 ? "red" : "green"} icon={UserX} />
+        <StatTile index={0} label="Proctors" value={data.proctors.length} icon={Users} />
+        <StatTile index={1} label="Average Load" value={data.avgLoad} tone="blue" icon={Scale} />
+        <StatTile index={2} label="Spread (min–max)" value={`${data.minLoad}–${data.maxLoad}`} tone={imbalanced ? "amber" : "green"} icon={Scale} />
+        <StatTile index={3} label="Unassigned Students" value={data.unassignedCount} tone={data.unassignedCount > 0 ? "red" : "green"} icon={UserX} />
       </div>
 
       <Card>

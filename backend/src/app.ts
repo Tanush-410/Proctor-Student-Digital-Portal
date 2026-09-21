@@ -16,6 +16,9 @@ import { notificationsRouter } from "./modules/notifications/routes";
 import { auditRouter } from "./modules/audit/routes";
 import { attendanceRouter } from "./modules/attendance/routes";
 import { accoladesRouter } from "./modules/accolades/routes";
+import { messagesRouter } from "./modules/messages/routes";
+import { markRequestsRouter } from "./modules/markRequests/routes";
+import { circularsRouter } from "./modules/circulars/routes";
 
 export function createApp(options: { enforceHttps?: boolean } = {}) {
   const app = express();
@@ -116,6 +119,9 @@ export function createApp(options: { enforceHttps?: boolean } = {}) {
   api.use("/", auditRouter);
   api.use("/", attendanceRouter);
   api.use("/", accoladesRouter);
+  api.use("/", messagesRouter);
+  api.use("/", markRequestsRouter);
+  api.use("/", circularsRouter);
 
   app.use("/api", api);
 

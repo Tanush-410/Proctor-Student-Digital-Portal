@@ -79,6 +79,7 @@ async function computeRunningTotal(usn: string): Promise<number> {
 const claimSchema = z.object({
   description: z.string().min(1),
   requestedPoints: z.coerce.number().int().positive(),
+  semester: z.coerce.number().int().min(1).max(8).optional(),
 });
 
 // POST /activity-points/claims — submit a new claim.
@@ -96,6 +97,7 @@ activityPointsRouter.post("/activity-points/claims", requireAuth, requireRole("S
       proofFile: req.file ? `/uploads/proofs/${req.file.filename}` : null,
       description: parsed.data.description,
       requestedPoints: parsed.data.requestedPoints,
+      semester: parsed.data.semester ?? student.currentSemester,
       status: "PENDING",
     },
   });
@@ -242,4 +244,42 @@ export async function computeActivityPointsAnalytics() {
 // the HOD's Activity Points tab.
 activityPointsRouter.get("/admin/activity-points/analytics", requireAuth, requireRole("ADMIN"), async (_req: AuthedRequest, res) => {
   res.json(await computeActivityPointsAnalytics());
+});
+
+/** Shared by the admin (all students) and proctor (own proctees only) matrix
+ * routes — every in-scope student's approved points broken down by the
+ * semester they were claimed in (Sem 1..8), plus a running total. Claims
+ * predating the semester field (or submitted without one) fall under
+ * "unspecified" rather than being silently dropped from the total. */
+async function computeActivityPointsMatrix(studentWhere: { proctorId?: number | null } = {}) {
+  const students = await prisma.student.findMany({ where: studentWhere, select: { usn: true, name: true, section: true }, orderBy: { usn: "asc" } });
+  const usns = students.map((s) => s.usn);
+  const claims = await prisma.activityPointClaim.findMany({
+    where: { status: "APPROVED", usn: { in: usns } },
+    select: { usn: true, semester: true, grantedPoints: true },
+  });
+
+  const bySemester = new Map<string, Record<string, number>>();
+  for (const c of claims) {
+    const key = c.semester ? String(c.semester) : "unspecified";
+    const student = bySemester.get(c.usn) ?? {};
+    student[key] = (student[key] ?? 0) + (c.grantedPoints ?? 0);
+    bySemester.set(c.usn, student);
+  }
+
+  return students.map((s) => {
+    const bySem = bySemester.get(s.usn) ?? {};
+    const total = Object.values(bySem).reduce((sum, p) => sum + p, 0);
+    return { usn: s.usn, name: s.name, section: s.section, bySemester: bySem, total };
+  });
+}
+
+// GET /admin/activity-points/matrix — every student.
+activityPointsRouter.get("/admin/activity-points/matrix", requireAuth, requireRole("ADMIN"), async (_req: AuthedRequest, res) => {
+  res.json({ rows: await computeActivityPointsMatrix() });
+});
+
+// GET /proctor/activity-points/matrix — only the requesting proctor's own proctees.
+activityPointsRouter.get("/proctor/activity-points/matrix", requireAuth, requireRole("PROCTOR"), async (req: AuthedRequest, res) => {
+  res.json({ rows: await computeActivityPointsMatrix({ proctorId: req.auth!.facultyId }) });
 });

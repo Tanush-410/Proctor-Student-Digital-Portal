@@ -3,7 +3,24 @@ import { Link } from "react-router-dom";
 import { Award, Download, FileClock, Layers, Trophy, Users } from "lucide-react";
 import { api } from "../../api/client";
 import { useToast } from "../../components/Toast";
-import { Avatar, Badge, Button, Card, CardHeader, EmptyState, PageSpinner, ResponsiveTable, StatRowCard, StatTile } from "../../components/ui";
+import {
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  Density,
+  DensityToggle,
+  DENSITY_PAD,
+  EmptyState,
+  PageSpinner,
+  ResponsiveTable,
+  SortableTh,
+  StatRowCard,
+  StatTile,
+  StickyScrollTable,
+  useSort,
+} from "../../components/ui";
 import { BarChart } from "../../components/charts";
 
 interface SectionStat {
@@ -27,16 +44,32 @@ interface Analytics {
   bySection: SectionStat[];
   leaderboard: LeaderboardEntry[];
 }
+interface MatrixRow {
+  usn: string;
+  name: string;
+  section: string | null;
+  bySemester: Record<string, number>;
+  total: number;
+}
 
 const RANK_TONE: ("blue" | "slate")[] = ["blue", "blue", "blue"];
+const SEMESTERS = [1, 2, 3, 4];
 
 export default function AdminActivityPoints() {
   const toast = useToast();
   const [data, setData] = useState<Analytics | null>(null);
+  const [matrix, setMatrix] = useState<MatrixRow[] | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [density, setDensity] = useState<Density>("comfortable");
+  const { sorted: sortedMatrix, sortKey, dir, toggle } = useSort<MatrixRow>(matrix ?? [], (row, key) => {
+    if (key === "name") return row.name;
+    if (key === "total") return row.total;
+    return row.bySemester[key] ?? -1;
+  });
 
   useEffect(() => {
     api.get("/admin/activity-points/analytics").then(setData);
+    api.get("/admin/activity-points/matrix").then((d) => setMatrix(d.rows));
   }, []);
 
   async function downloadReport() {
@@ -68,10 +101,10 @@ export default function AdminActivityPoints() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatTile label="Students" value={data.totalStudents} icon={Users} />
-        <StatTile label="Total Approved Points" value={data.totalApprovedPoints} tone="blue" icon={Award} />
-        <StatTile label="Pending Claims" value={data.pendingCount} tone={data.pendingCount > 0 ? "amber" : "green"} icon={FileClock} />
-        <StatTile label="Approved / Rejected" value={`${data.approvedCount} / ${data.rejectedCount}`} icon={Layers} />
+        <StatTile index={0} label="Students" value={data.totalStudents} icon={Users} />
+        <StatTile index={1} label="Total Approved Points" value={data.totalApprovedPoints} tone="blue" icon={Award} />
+        <StatTile index={2} label="Pending Claims" value={data.pendingCount} tone={data.pendingCount > 0 ? "amber" : "green"} icon={FileClock} />
+        <StatTile index={3} label="Approved / Rejected" value={`${data.approvedCount} / ${data.rejectedCount}`} icon={Layers} />
       </div>
 
       <Card>
@@ -119,6 +152,62 @@ export default function AdminActivityPoints() {
             />
           ))}
         />
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="By Student, By Semester"
+          subtitle="Approved points claimed each semester, per student. Click a column to sort."
+          icon={Award}
+          action={matrix && matrix.length > 0 ? <DensityToggle density={density} onChange={setDensity} /> : undefined}
+        />
+        {!matrix ? (
+          <div className="px-5 py-8 text-center text-sm text-slate-400">Loading...</div>
+        ) : matrix.length === 0 ? (
+          <EmptyState message="No students recorded yet." icon={Award} />
+        ) : (
+          <StickyScrollTable>
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 z-10 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-400 shadow-[0_1px_0_0_theme(colors.slate.200)]">
+                <tr>
+                  <SortableTh sortKey="name" activeKey={sortKey} dir={dir} onSort={toggle} className="whitespace-nowrap">
+                    Student
+                  </SortableTh>
+                  {SEMESTERS.map((s) => (
+                    <SortableTh key={s} sortKey={String(s)} activeKey={sortKey} dir={dir} onSort={toggle} align="right" className="whitespace-nowrap">
+                      Sem {s}
+                    </SortableTh>
+                  ))}
+                  <SortableTh sortKey="total" activeKey={sortKey} dir={dir} onSort={toggle} align="right" className="whitespace-nowrap">
+                    Total
+                  </SortableTh>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedMatrix.map((row) => (
+                  <tr key={row.usn} className="border-t border-slate-100">
+                    <td className={`whitespace-nowrap px-5 ${DENSITY_PAD[density]}`}>
+                      <Link to={`/admin/students/${row.usn}`} className="font-medium text-slate-800 hover:underline">
+                        {row.name}
+                      </Link>
+                      <div className="font-mono text-[11px] text-slate-400">
+                        {row.usn} {row.section && `· Sec ${row.section}`}
+                      </div>
+                    </td>
+                    {SEMESTERS.map((s) => (
+                      <td key={s} className={`px-3 ${DENSITY_PAD[density]} text-right text-slate-600`}>
+                        {row.bySemester[String(s)] ?? "-"}
+                      </td>
+                    ))}
+                    <td className={`px-5 ${DENSITY_PAD[density]} text-right`}>
+                      <Badge tone={row.total > 0 ? "blue" : "slate"}>{row.total}</Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </StickyScrollTable>
+        )}
       </Card>
 
       <Card>

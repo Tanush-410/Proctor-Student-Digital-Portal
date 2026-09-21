@@ -1,6 +1,8 @@
-import { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
+import { ButtonHTMLAttributes, HTMLAttributes, ReactNode, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { LucideIcon } from "lucide-react";
+import { motion } from "framer-motion";
+import { ArrowDown, ArrowUp, ArrowUpDown, LucideIcon, Rows3, Rows4 } from "lucide-react";
+import { Area, AreaChart, ResponsiveContainer } from "recharts";
 
 export function Card({ children, className = "", ...rest }: HTMLAttributes<HTMLDivElement>) {
   return (
@@ -91,17 +93,27 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 px-5 py-14 text-center">
+    <div className="relative flex flex-col items-center justify-center gap-3 overflow-hidden px-5 py-14 text-center">
+      {/* Faint BMS crest behind the icon — ties every empty state back to the
+          same brand mark used on the watermark/hero rather than a plain
+          generic icon-in-a-box, at near-zero cost since it's one shared
+          component feeding all ~18 empty states in the app. */}
+      <img
+        src="/bms-logo.svg"
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 opacity-[0.05]"
+      />
       {Icon && (
-        <div className="mb-1 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 text-slate-400 ring-1 ring-slate-200/60">
+        <div className="relative mb-1 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 text-slate-400 ring-1 ring-slate-200/60">
           <Icon className="h-6 w-6" />
         </div>
       )}
-      <div className="space-y-1">
+      <div className="relative space-y-1">
         <p className="text-sm font-medium text-slate-600">{message}</p>
         {hint && <p className="mx-auto max-w-xs text-xs text-slate-400">{hint}</p>}
       </div>
-      {action && <div className="mt-1">{action}</div>}
+      {action && <div className="relative mt-1">{action}</div>}
     </div>
   );
 }
@@ -228,39 +240,80 @@ const STAT_TONE: Record<string, { text: string; iconBg: string; iconText: string
   blue: { text: "text-brand-600", iconBg: "bg-brand-50", iconText: "text-brand-600", accent: "bg-brand-500" },
 };
 
+const SPARK_COLOR: Record<string, string> = {
+  slate: "#94a3b8",
+  green: "#10b981",
+  red: "#ef4444",
+  amber: "#f59e0b",
+  blue: "#00519c",
+};
+
 export function StatTile({
   label,
   value,
   tone = "slate",
   icon: Icon,
   loading,
+  index,
+  trend,
 }: {
   label: string;
   value: ReactNode;
   tone?: "slate" | "green" | "red" | "amber" | "blue";
   icon?: LucideIcon;
   loading?: boolean;
+  /** Position within a stat-tile grid — when set, the tile fades/slides in with a
+   * per-index delay so a row of tiles arrives as a soft cascade rather than all at
+   * once. Omit for a tile shown alone (e.g. a lone CGPA stat), where a stagger has
+   * nothing to stagger against. */
+  index?: number;
+  /** Optional series (e.g. SGPA per semester) rendered as a tiny sparkline
+   * under the value — only worth passing when there's a real trend behind
+   * the number; a single-point or absent trend renders nothing. */
+  trend?: number[];
 }) {
   const t = STAT_TONE[tone];
+  const showTrend = trend && trend.length > 1;
   return (
-    <Card className="group relative overflow-hidden px-5 py-4 transition-all duration-200 ease-premium hover:-translate-y-0.5 hover:shadow-popover">
-      <div className={`absolute inset-x-0 top-0 h-0.5 ${t.accent} opacity-0 transition-opacity duration-200 group-hover:opacity-100`} />
-      <div className="flex items-start justify-between">
-        <div className="min-w-0">
-          <div className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</div>
-          {loading ? (
-            <Skeleton className="mt-2 h-7 w-16" />
-          ) : (
-            <div className={`mt-1 text-2xl font-semibold tracking-tight ${t.text}`}>{value}</div>
+    <motion.div
+      initial={index !== undefined ? { opacity: 0, y: 10 } : false}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay: (index ?? 0) * 0.06, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <Card className="group relative overflow-hidden px-5 py-4 transition-all duration-200 ease-premium hover:-translate-y-0.5 hover:shadow-popover">
+        <div className={`absolute inset-x-0 top-0 h-0.5 ${t.accent} opacity-0 transition-opacity duration-200 group-hover:opacity-100`} />
+        <div className="flex items-start justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</div>
+            {loading ? (
+              <Skeleton className="mt-2 h-7 w-16" />
+            ) : (
+              <div className={`mt-1 text-2xl font-semibold tracking-tight ${t.text}`}>{value}</div>
+            )}
+          </div>
+          {Icon && !showTrend && (
+            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${t.iconBg} ${t.iconText}`}>
+              <Icon className="h-4 w-4" />
+            </div>
+          )}
+          {showTrend && (
+            <div className="h-9 w-16 shrink-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trend.map((v) => ({ v }))} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+                  <defs>
+                    <linearGradient id={`spark-${label}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={SPARK_COLOR[tone]} stopOpacity={0.35} />
+                      <stop offset="100%" stopColor={SPARK_COLOR[tone]} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Area type="monotone" dataKey="v" stroke={SPARK_COLOR[tone]} strokeWidth={1.75} fill={`url(#spark-${label})`} isAnimationActive={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           )}
         </div>
-        {Icon && (
-          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${t.iconBg} ${t.iconText}`}>
-            <Icon className="h-4 w-4" />
-          </div>
-        )}
-      </div>
-    </Card>
+      </Card>
+    </motion.div>
   );
 }
 
@@ -306,6 +359,30 @@ export function ResponsiveTable({ table, cards }: { table: ReactNode; cards: Rea
   );
 }
 
+/** A pill-style tab strip for picking one semester out of a student's
+ * academic record, so a multi-semester history reads as one focused panel
+ * instead of a long stacked list. */
+export function SemesterTabs({ semesters, active, onChange }: { semesters: number[]; active: number; onChange: (sem: number) => void }) {
+  return (
+    <div role="tablist" aria-label="Select semester" className="flex flex-wrap gap-1.5">
+      {semesters.map((sem) => (
+        <button
+          key={sem}
+          type="button"
+          role="tab"
+          aria-selected={sem === active}
+          onClick={() => onChange(sem)}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+            sem === active ? "bg-brand-600 text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          Semester {sem}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** One row of a ResponsiveTable's mobile card list — leading visual, a title
  * + one or two meta lines, and trailing content (a badge, a value, an
  * action). Matches the row shape already used by Directory's search results. */
@@ -340,6 +417,115 @@ export function StatRowCard({ title, stats }: { title: ReactNode; stats: { label
         ))}
       </div>
     </li>
+  );
+}
+
+export type SortDir = "asc" | "desc";
+
+/** Client-side sort for a table's rows by an arbitrary string/number key,
+ * shared by every table big enough to benefit from sorting (rebuilding this
+ * per-page would mean duplicating the same comparator logic in each one). */
+export function useSort<T>(rows: T[], accessor: (row: T, key: string) => string | number, initialKey?: string) {
+  const [sortKey, setSortKey] = useState<string | undefined>(initialKey);
+  const [dir, setDir] = useState<SortDir>("desc");
+
+  function toggle(key: string) {
+    if (sortKey === key) setDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setDir("desc");
+    }
+  }
+
+  const sorted = useMemo(() => {
+    if (!sortKey) return rows;
+    const copy = [...rows];
+    copy.sort((a, b) => {
+      const av = accessor(a, sortKey);
+      const bv = accessor(b, sortKey);
+      const cmp = typeof av === "number" && typeof bv === "number" ? av - bv : String(av).localeCompare(String(bv));
+      return dir === "asc" ? cmp : -cmp;
+    });
+    return copy;
+  }, [rows, sortKey, dir, accessor]);
+
+  return { sorted, sortKey, dir, toggle };
+}
+
+/** A <th> that's clickable to sort by `sortKey`, with an arrow showing
+ * current direction once active and a neutral hint icon otherwise. */
+export function SortableTh({
+  children,
+  sortKey,
+  activeKey,
+  dir,
+  onSort,
+  align = "left",
+  className = "",
+}: {
+  children: ReactNode;
+  sortKey: string;
+  activeKey?: string;
+  dir: SortDir;
+  onSort: (key: string) => void;
+  align?: "left" | "right" | "center";
+  className?: string;
+}) {
+  const active = sortKey === activeKey;
+  const Icon = active ? (dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  const alignClass = align === "right" ? "justify-end text-right" : align === "center" ? "justify-center text-center" : "justify-start text-left";
+  return (
+    <th className={`px-3 py-2.5 font-medium ${className}`}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex w-full items-center gap-1 select-none whitespace-nowrap transition-colors hover:text-slate-700 ${alignClass} ${active ? "text-slate-700" : ""}`}
+      >
+        {children}
+        <Icon className={`h-3 w-3 shrink-0 ${active ? "text-brand-600" : "text-slate-300"}`} />
+      </button>
+    </th>
+  );
+}
+
+export type Density = "comfortable" | "compact";
+
+/** Row vertical padding for the two density levels, shared so every table
+ * using the toggle looks consistent rather than each page picking its own
+ * compact spacing. */
+export const DENSITY_PAD: Record<Density, string> = { comfortable: "py-2.5", compact: "py-1.5" };
+
+export function DensityToggle({ density, onChange }: { density: Density; onChange: (d: Density) => void }) {
+  return (
+    <div role="radiogroup" aria-label="Row density" className="inline-flex items-center rounded-lg border border-slate-200 bg-white p-0.5 text-xs">
+      {(["comfortable", "compact"] as Density[]).map((d) => (
+        <button
+          key={d}
+          role="radio"
+          aria-checked={density === d}
+          onClick={() => onChange(d)}
+          className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium capitalize transition-colors ${
+            density === d ? "bg-brand-50 text-brand-700" : "text-slate-500 hover:bg-slate-50"
+          }`}
+        >
+          {d === "compact" ? <Rows4 className="h-3.5 w-3.5" /> : <Rows3 className="h-3.5 w-3.5" />}
+          {d}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Bounds a table to `maxHeight` with its own scrollbar and a header that
+ * stays pinned while the body scrolls — for the handful of tables long
+ * enough (dozens+ of rows) that losing the header on scroll actually hurts.
+ * The <thead> passed in must have an opaque background (not the usual
+ * translucent bg-slate-50/70) or rows will show through it while stuck. */
+export function StickyScrollTable({ children, maxHeight = "32rem" }: { children: ReactNode; maxHeight?: string }) {
+  return (
+    <div className="overflow-auto rounded-b-2xl" style={{ maxHeight }}>
+      {children}
+    </div>
   );
 }
 

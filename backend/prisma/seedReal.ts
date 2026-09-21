@@ -1,10 +1,12 @@
 /**
- * Loads the real BMSCE CSE cohort (proctors PN + MVM) from prisma/data/cohort.json
- * into whatever database DATABASE_URL points at. This is the actual data used in
- * the live app — the snapshot is regenerated from department source files by
- * prisma/data/buildCohort.ts (or dumped from a live DB by prisma/exportCohort.ts).
+ * Loads the real BMSCE CSE Cluster-A cohort (all proctors/semesters) from
+ * prisma/data/cohort.json into whatever database DATABASE_URL points at. This
+ * is the actual data used in the live app — the snapshot is regenerated from
+ * the live database by prisma/exportCohort.ts (`npm run seed:export`), or for
+ * the original small PN/MVM subset, from department source files by
+ * prisma/data/buildCohort.ts.
  *
- *   npm run seed:real
+ *   npm run seed
  *
  * Wipes faculty/student/result_record/claims/ptm first, so it is a full reset —
  * do not run it against a database you don't want replaced.

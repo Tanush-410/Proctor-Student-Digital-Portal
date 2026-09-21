@@ -2,6 +2,7 @@ import path from "path";
 import fs from "fs";
 import PDFDocument from "pdfkit";
 import { Response } from "express";
+import { Parser } from "htmlparser2";
 import { Student, Faculty } from "@prisma/client";
 import { EffectiveResult } from "../results/engine";
 
@@ -50,6 +51,42 @@ function drawWatermark(doc: Doc) {
   doc.restore();
 }
 
+/** The same brand-blue gradient banner the web app opens every portal page
+ * with (DashboardHero.tsx) — a rounded gradient panel, the crest large and
+ * faint in the corner, title/subtitle in white — so a printed report and the
+ * screen it came from read as the same product instead of a plain document
+ * bolted onto a designed app. Returns the y-position just below the banner
+ * so the rest of the report can flow beneath it. */
+function drawHeroBanner(doc: Doc, title: string, subtitle: string): number {
+  const left = doc.page.margins.left;
+  const top = doc.y;
+  const w = doc.page.width - left - doc.page.margins.right;
+  const h = 96;
+  const radius = 10;
+
+  doc.save();
+  doc.roundedRect(left, top, w, h, radius).clip();
+  const gradient = doc.linearGradient(left, top, left + w, top + h);
+  gradient.stop(0, "#00427d").stop(0.55, "#00519c").stop(1, "#032a4d");
+  doc.rect(left, top, w, h).fill(gradient);
+
+  if (fs.existsSync(LOGO_PATH)) {
+    const crestSize = h * 1.9;
+    doc.opacity(0.16);
+    doc.image(LOGO_PATH, left + w - crestSize * 0.62, top + h - crestSize * 0.72, { width: crestSize, height: crestSize });
+    doc.opacity(1);
+  }
+  doc.restore();
+
+  doc.save();
+  doc.fillColor("#ffffff").fontSize(17).text(title, left + 22, top + 20, { width: w - 44 });
+  doc.fillColor("#cfe0f2").fontSize(9.5).text(subtitle, left + 22, top + 44, { width: w - 220 });
+  doc.restore();
+  doc.fillColor("black");
+
+  return top + h + 18;
+}
+
 /** ReportGenerationService.buildParentSummary — streams a PDF built from the effective-results view. */
 export function buildParentSummaryPdf(data: ParentSummaryData, res: Response) {
   const doc = new PDFDocument({ margin: 50 });
@@ -60,15 +97,9 @@ export function buildParentSummaryPdf(data: ParentSummaryData, res: Response) {
   drawWatermark(doc);
   doc.on("pageAdded", () => drawWatermark(doc));
 
-  if (fs.existsSync(LOGO_PATH)) {
-    doc.image(LOGO_PATH, doc.page.width / 2 - 32, doc.y, { width: 64, height: 64 });
-    doc.moveDown(4.6);
-  }
-  doc.fontSize(18).text("Parent Summary Report", { align: "center" });
-  doc.moveDown(0.5);
-  doc.fontSize(10).fillColor("gray").text("BMS College of Engineering — Online Proctor Diary & Student Academic Management System", { align: "center" });
-  doc.fillColor("black");
-  doc.moveDown(1.5);
+  doc.y = drawHeroBanner(doc, "Parent Summary Report", "BMS College of Engineering — Online Proctor Diary & Student Academic Management System");
+  doc.x = doc.page.margins.left;
+  doc.moveDown(0.6);
 
   doc.fontSize(13).text("Student Details");
   doc.moveDown(0.3);
@@ -157,15 +188,9 @@ export function buildActivityPointsReportPdf(data: ActivityPointsReportData, res
   drawWatermark(doc);
   doc.on("pageAdded", () => drawWatermark(doc));
 
-  if (fs.existsSync(LOGO_PATH)) {
-    doc.image(LOGO_PATH, doc.page.width / 2 - 32, doc.y, { width: 64, height: 64 });
-    doc.moveDown(4.6);
-  }
-  doc.fontSize(18).text("Activity Points Report", { align: "center" });
-  doc.moveDown(0.5);
-  doc.fontSize(10).fillColor("gray").text("BMS College of Engineering — Department-wide Summary", { align: "center" });
-  doc.fillColor("black");
-  doc.moveDown(1.5);
+  doc.y = drawHeroBanner(doc, "Activity Points Report", "BMS College of Engineering — Department-wide Summary");
+  doc.x = doc.page.margins.left;
+  doc.moveDown(0.6);
 
   doc.fontSize(13).text("Overview");
   doc.moveDown(0.3);
@@ -239,6 +264,240 @@ export function buildActivityPointsReportPdf(data: ActivityPointsReportData, res
   doc.fontSize(8).fillColor("gray").text(`Generated ${new Date().toLocaleString()}`, left, doc.page.height - doc.page.margins.bottom - 20, { align: "right", width: usableW });
 
   doc.end();
+}
+
+export interface PtmRecordData {
+  ptmId: number;
+  ptmDate: string;
+  ptmTime: string;
+  notes: string | null;
+  createdAt: Date;
+  usn: string | null;
+  proctor: { name: string; shortCode: string };
+  student: { name: string; usn: string; section?: string | null } | null;
+}
+
+/** ReportGenerationService.buildPtmRecordPdf — the same document a proctor's
+ * "View" link opens in the browser, as a downloadable PDF with the standard
+ * hero banner + crest watermark. */
+export function buildPtmRecordPdf(data: PtmRecordData, res: Response) {
+  const doc = new PDFDocument({ margin: 50 });
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="ptm-${data.ptmId}.pdf"`);
+  doc.pipe(res);
+
+  drawWatermark(doc);
+  doc.on("pageAdded", () => drawWatermark(doc));
+
+  const subtitle = data.student ? `${data.student.name} (${data.student.usn})` : "General meeting — not tied to one student";
+  doc.y = drawHeroBanner(doc, "PTM Record", subtitle);
+  doc.x = doc.page.margins.left;
+  doc.moveDown(0.8);
+
+  const left = doc.page.margins.left;
+  const usableW = doc.page.width - left - doc.page.margins.right;
+
+  doc.fontSize(10).fillColor("#334155");
+  doc.text(`Meeting date: ${data.ptmDate} at ${data.ptmTime}`);
+  doc.text(`Recorded by: ${data.proctor.name} (${data.proctor.shortCode})`);
+  doc.text(`Written on: ${data.createdAt.toLocaleString()}`);
+  doc.fillColor("black");
+  doc.moveDown(1);
+
+  doc.fontSize(13).text("Notes");
+  doc.moveDown(0.4);
+
+  if (!data.notes || isEmptyNoteHtml(data.notes)) {
+    doc.fontSize(10).fillColor("gray").text("No notes were recorded for this meeting.").fillColor("black");
+  } else {
+    renderNoteHtml(doc, data.notes, left, usableW);
+  }
+
+  doc.moveDown(2);
+  doc.fontSize(8).fillColor("gray").text(`Generated ${new Date().toLocaleString()}`, { align: "right" });
+
+  doc.end();
+}
+
+export interface CircularPdfData {
+  id: number;
+  title: string;
+  body: string;
+  createdAt: Date;
+  sender: { name: string; shortCode: string };
+  recipientCount: number;
+}
+
+/** ReportGenerationService.buildCircularPdf — an inline-authored circular
+ * rendered exactly like a PTM record: hero banner, crest watermark, the
+ * rich-text body run through the same HTML->PDFKit renderer. Only for
+ * circulars composed in the editor; an uploaded PDF/Word circular is served
+ * as the file it is, not regenerated. */
+export function buildCircularPdf(data: CircularPdfData, res: Response) {
+  const doc = new PDFDocument({ margin: 50 });
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `inline; filename="circular-${data.id}.pdf"`);
+  doc.pipe(res);
+
+  drawWatermark(doc);
+  doc.on("pageAdded", () => drawWatermark(doc));
+
+  doc.y = drawHeroBanner(doc, data.title, "BMS College of Engineering — Department Circular");
+  doc.x = doc.page.margins.left;
+  doc.moveDown(0.8);
+
+  const left = doc.page.margins.left;
+  const usableW = doc.page.width - left - doc.page.margins.right;
+
+  doc.fontSize(10).fillColor("#334155");
+  doc.text(`From: ${data.sender.name} (${data.sender.shortCode})`);
+  doc.text(`Sent: ${data.createdAt.toLocaleString()}`);
+  doc.text(`Circulated to: ${data.recipientCount} recipient${data.recipientCount === 1 ? "" : "s"}`);
+  doc.fillColor("black");
+  doc.moveDown(1);
+
+  if (isEmptyNoteHtml(data.body)) {
+    doc.fontSize(10).fillColor("gray").text("(No content.)").fillColor("black");
+  } else {
+    renderNoteHtml(doc, data.body, left, usableW);
+  }
+
+  doc.moveDown(2);
+  doc.fontSize(8).fillColor("gray").text(`Generated ${new Date().toLocaleString()}`, { align: "right" });
+
+  doc.end();
+}
+
+function isEmptyNoteHtml(html: string): boolean {
+  return html.replace(/<[^>]*>/g, "").trim().length === 0;
+}
+
+// ---------- minimal HTML -> PDFKit renderer, scoped to exactly the tags the
+// PTM note editor's schema can ever produce (p, strong, em, u, s, h2, h3,
+// ul/ol/li, br) — not a general-purpose HTML renderer. ----------
+
+interface NoteRun {
+  text: string;
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  strike: boolean;
+}
+interface NoteBlock {
+  type: "p" | "h2" | "h3" | "li";
+  runs: NoteRun[];
+  listType?: "ul" | "ol";
+  listIndex?: number;
+}
+
+function parseNoteHtml(html: string): NoteBlock[] {
+  const blocks: NoteBlock[] = [];
+  let bold = 0;
+  let italic = 0;
+  let underline = 0;
+  let strike = 0;
+  let current: NoteBlock | null = null;
+  const listTypeStack: ("ul" | "ol")[] = [];
+  const listCounterStack: number[] = [];
+
+  function flush() {
+    if (current) blocks.push(current);
+    current = null;
+  }
+
+  const parser = new Parser(
+    {
+      onopentag(name) {
+        if (name === "strong") bold++;
+        else if (name === "em") italic++;
+        else if (name === "u") underline++;
+        else if (name === "s") strike++;
+        else if (name === "p") {
+          // TipTap always wraps a list item's text in its own <p> (<li><p>...
+          // </p></li>) — that <p> is structural, not a second paragraph, so
+          // if we're already mid-<li> it must NOT overwrite that block (that
+          // silently downgraded every list item to a plain, bullet-less
+          // paragraph — the <li> block was built, then immediately discarded
+          // unflushed the moment its inner <p> opened).
+          if (!current || current.type !== "li") current = { type: "p", runs: [] };
+        } else if (name === "h2" || name === "h3") {
+          current = { type: name, runs: [] };
+        } else if (name === "ul" || name === "ol") {
+          listTypeStack.push(name);
+          listCounterStack.push(0);
+        } else if (name === "li") {
+          if (listTypeStack.length) listCounterStack[listCounterStack.length - 1]++;
+          current = { type: "li", runs: [], listType: listTypeStack[listTypeStack.length - 1], listIndex: listCounterStack[listCounterStack.length - 1] };
+        } else if (name === "br" && current) {
+          // Splits the paragraph rather than embedding a newline mid-run — PDFKit's
+          // continued-text chains don't have a clean "break here, same style" primitive.
+          const cont: NoteBlock = { type: current.type, runs: [], listType: current.listType, listIndex: current.listIndex };
+          flush();
+          current = cont;
+        }
+      },
+      onclosetag(name) {
+        if (name === "strong") bold = Math.max(0, bold - 1);
+        else if (name === "em") italic = Math.max(0, italic - 1);
+        else if (name === "u") underline = Math.max(0, underline - 1);
+        else if (name === "s") strike = Math.max(0, strike - 1);
+        // A closing </p> only flushes when it's a real top-level paragraph —
+        // inside a <li> it's the structural wrapper, so the </li> (not this)
+        // is what should flush that block.
+        else if (name === "p") {
+          if (current && current.type === "p") flush();
+        } else if (name === "h2" || name === "h3" || name === "li") flush();
+        else if (name === "ul" || name === "ol") {
+          listTypeStack.pop();
+          listCounterStack.pop();
+        }
+      },
+      ontext(text) {
+        if (current && text) current.runs.push({ text, bold: bold > 0, italic: italic > 0, underline: underline > 0, strike: strike > 0 });
+      },
+    },
+    { decodeEntities: true }
+  );
+  parser.write(html);
+  parser.end();
+  flush();
+  return blocks;
+}
+
+function noteFont(bold: boolean, italic: boolean): string {
+  if (bold && italic) return "Helvetica-BoldOblique";
+  if (bold) return "Helvetica-Bold";
+  if (italic) return "Helvetica-Oblique";
+  return "Helvetica";
+}
+
+function renderNoteHtml(doc: Doc, html: string, left: number, width: number) {
+  const blocks = parseNoteHtml(html);
+  for (const block of blocks) {
+    const indent = block.type === "li" ? 16 : 0;
+    const size = block.type === "h2" ? 13 : block.type === "h3" ? 11.5 : 10;
+    doc.fontSize(size).fillColor("black");
+
+    if (block.runs.length === 0) {
+      doc.moveDown(0.4);
+      continue;
+    }
+
+    const prefix: NoteRun | null = block.type === "li" ? { text: block.listType === "ol" ? `${block.listIndex}.  ` : "•  ", bold: false, italic: false, underline: false, strike: false } : null;
+    const parts = prefix ? [prefix, ...block.runs] : block.runs;
+
+    parts.forEach((run, i) => {
+      const isFirst = i === 0;
+      const isLast = i === parts.length - 1;
+      doc.font(noteFont(run.bold, run.italic));
+      if (isFirst) {
+        doc.text(run.text, left + indent, doc.y, { continued: !isLast, underline: run.underline, strike: run.strike, width: width - indent });
+      } else {
+        doc.text(run.text, { continued: !isLast, underline: run.underline, strike: run.strike });
+      }
+    });
+    doc.moveDown(block.type === "h2" || block.type === "h3" ? 0.45 : 0.35);
+  }
 }
 
 function drawChartsPage(doc: Doc, data: ParentSummaryData, semesters: number[]) {

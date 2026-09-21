@@ -7,6 +7,7 @@ import { useToast } from "../../components/Toast";
 import { Modal } from "../../components/Modal";
 import { Avatar, Badge, Button, Card, CardHeader, EmptyState, Input, Label, ResponsiveTable, SkeletonAvatarRows, StatTile, Textarea } from "../../components/ui";
 import { DashboardHero } from "../../components/DashboardHero";
+import { isEmptyHtml, RichTextEditor } from "../../components/RichTextEditor";
 
 interface StudentRow {
   usn: string;
@@ -56,6 +57,7 @@ export default function ProctorDashboard() {
   const [bulkDate, setBulkDate] = useState("");
   const [bulkTime, setBulkTime] = useState("");
   const [bulkText, setBulkText] = useState("");
+  const [bulkEditorKey, setBulkEditorKey] = useState(0);
   const [bulkBusy, setBulkBusy] = useState(false);
 
   function load() {
@@ -94,13 +96,14 @@ export default function ProctorDashboard() {
     setBulkDate("");
     setBulkTime("");
     setBulkText("");
+    setBulkEditorKey((k) => k + 1);
   }
 
   async function submitBulkPtm(e: FormEvent) {
     e.preventDefault();
     setBulkBusy(true);
     try {
-      const res = await api.post("/ptm/bulk", { ptmDate: bulkDate, ptmTime: bulkTime, notes: bulkText || undefined, usns: [...selected] });
+      const res = await api.post("/ptm/bulk", { ptmDate: bulkDate, ptmTime: bulkTime, notes: isEmptyHtml(bulkText) ? undefined : bulkText, usns: [...selected] });
       toast.success(`PTM logged for ${res.created} student(s)`, res.skipped.length ? `${res.skipped.length} skipped.` : undefined);
       closeBulkModal();
       setSelected(new Set());
@@ -136,12 +139,12 @@ export default function ProctorDashboard() {
       />
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        <StatTile label="Proctees" value={students?.length ?? 0} tone="blue" icon={Users} loading={students === null} />
-        <StatTile label="Pending Claims" value={pendingClaims ?? 0} tone={pendingClaims ? "amber" : "green"} icon={Award} loading={pendingClaims === null} />
-        <StatTile label="Upcoming PTMs" value={upcomingPtms ?? 0} icon={CalendarClock} loading={upcomingPtms === null} />
-        <StatTile label="Avg. CGPA" value={analytics?.avgCgpa ?? "N/A"} tone="blue" icon={GraduationCap} loading={analytics === null} />
-        <StatTile label="Backlogs" value={analytics?.backlogCount ?? 0} tone={analytics && analytics.backlogCount > 0 ? "red" : "green"} icon={XCircle} loading={analytics === null} />
-        <StatTile label="At Risk" value={analytics?.atRisk.length ?? 0} tone={analytics && analytics.atRisk.length > 0 ? "amber" : "green"} icon={AlertTriangle} loading={analytics === null} />
+        <StatTile index={0} label="Proctees" value={students?.length ?? 0} tone="blue" icon={Users} loading={students === null} />
+        <StatTile index={1} label="Pending Claims" value={pendingClaims ?? 0} tone={pendingClaims ? "amber" : "green"} icon={Award} loading={pendingClaims === null} />
+        <StatTile index={2} label="Upcoming PTMs" value={upcomingPtms ?? 0} icon={CalendarClock} loading={upcomingPtms === null} />
+        <StatTile index={3} label="Avg. CGPA" value={analytics?.avgCgpa ?? "N/A"} tone="blue" icon={GraduationCap} loading={analytics === null} />
+        <StatTile index={4} label="Backlogs" value={analytics?.backlogCount ?? 0} tone={analytics && analytics.backlogCount > 0 ? "red" : "green"} icon={XCircle} loading={analytics === null} />
+        <StatTile index={5} label="At Risk" value={analytics?.atRisk.length ?? 0} tone={analytics && analytics.atRisk.length > 0 ? "amber" : "green"} icon={AlertTriangle} loading={analytics === null} />
       </div>
 
       {analytics && analytics.atRisk.length > 0 && (
@@ -311,7 +314,7 @@ export default function ProctorDashboard() {
           </div>
           <div>
             <Label>Notes</Label>
-            <Textarea rows={3} value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder="Shared context for this meeting..." />
+            <RichTextEditor key={bulkEditorKey} content={bulkText} onChange={setBulkText} placeholder="Shared context for this meeting..." />
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <Button type="button" variant="secondary" onClick={closeBulkModal}>

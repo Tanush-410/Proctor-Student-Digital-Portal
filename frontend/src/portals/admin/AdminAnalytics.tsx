@@ -48,10 +48,10 @@ export default function AdminAnalytics() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatTile label="Students" value={data.studentCount} icon={Users} />
-        <StatTile label="Avg. CGPA" value={data.avgCgpa ?? "N/A"} tone="blue" icon={GraduationCap} />
-        <StatTile label="Total Backlogs" value={data.backlogCount} tone={data.backlogCount > 0 ? "red" : "green"} icon={XCircle} />
-        <StatTile label="At-Risk Students" value={data.atRiskCount} tone={data.atRiskCount > 0 ? "amber" : "green"} icon={AlertTriangle} />
+        <StatTile index={0} label="Students" value={data.studentCount} icon={Users} />
+        <StatTile index={1} label="Avg. CGPA" value={data.avgCgpa ?? "N/A"} tone="blue" icon={GraduationCap} />
+        <StatTile index={2} label="Total Backlogs" value={data.backlogCount} tone={data.backlogCount > 0 ? "red" : "green"} icon={XCircle} />
+        <StatTile index={3} label="At-Risk Students" value={data.atRiskCount} tone={data.atRiskCount > 0 ? "amber" : "green"} icon={AlertTriangle} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
