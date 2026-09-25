@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowDown, ArrowUp, ArrowUpDown, LucideIcon, Rows3, Rows4 } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer } from "recharts";
+import { twMerge } from "tailwind-merge";
 
 export function Card({ children, className = "", ...rest }: HTMLAttributes<HTMLDivElement>) {
   return (
@@ -164,11 +165,21 @@ export function SkeletonAvatarRows({ rows = 4 }: { rows?: number }) {
   );
 }
 
+// twMerge (not plain string concat) matters here: Tailwind's generated
+// stylesheet orders `.w-full` after e.g. `.w-20`/`.flex-1`, so a caller
+// passing a narrower width in className was silently losing the cascade to
+// this component's own default `w-full` — the width/flex-basis utility
+// specified last in the class LIST wins, not the one written last in JSX.
+// twMerge resolves the conflict by Tailwind semantics instead of source
+// order, so a caller's width override always applies.
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className={`w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs transition-shadow placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10 ${props.className ?? ""}`}
+      className={twMerge(
+        "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs transition-shadow placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10",
+        props.className
+      )}
     />
   );
 }
@@ -177,7 +188,10 @@ export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
   return (
     <textarea
       {...props}
-      className={`w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs transition-shadow placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10 ${props.className ?? ""}`}
+      className={twMerge(
+        "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs transition-shadow placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10",
+        props.className
+      )}
     />
   );
 }
@@ -186,7 +200,10 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...props}
-      className={`w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs transition-shadow focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10 ${props.className ?? ""}`}
+      className={twMerge(
+        "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-xs transition-shadow focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/10",
+        props.className
+      )}
     />
   );
 }

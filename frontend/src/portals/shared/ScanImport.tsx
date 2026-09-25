@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, CheckCircle2, Plus, ScanLine, Trash2, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, Plus, ScanLine, Trash2, XCircle } from "lucide-react";
 import { api, ApiError } from "../../api/client";
 import { useToast } from "../../components/Toast";
 import { FileDropzone } from "../../components/FileDropzone";
@@ -58,6 +58,7 @@ export default function ScanImport({ base: _base }: { base: string }) {
   const [semester, setSemester] = useState("4");
   const [sourceType, setSourceType] = useState("MAIN");
   const [subjects, setSubjects] = useState<SubjectDef[]>([{ code: "", name: "", credits: 4 }]);
+  const [triedExtract, setTriedExtract] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [result, setResult] = useState<ExtractResponse | null>(null);
@@ -88,8 +89,9 @@ export default function ScanImport({ base: _base }: { base: string }) {
 
   async function handleExtract() {
     if (!file) return;
+    setTriedExtract(true);
     if (subjects.some((s) => !s.code.trim())) {
-      toast.error("Add a subject code", "Every subject needs a code before extracting.");
+      toast.error("Add every subject code", "Each row below the paper sheet's subject columns needs a code — the ones outlined in red are still empty.");
       return;
     }
     setExtracting(true);
@@ -138,6 +140,7 @@ export default function ScanImport({ base: _base }: { base: string }) {
     setFile(null);
     setResult(null);
     setSummary(null);
+    setTriedExtract(false);
   }
 
   return (
@@ -154,11 +157,26 @@ export default function ScanImport({ base: _base }: { base: string }) {
         <>
           <Card>
             <CardHeader title="1. Sheet Details" icon={ScanLine} />
-            <div className="space-y-4 px-5 py-4">
+            <div className="space-y-5 px-5 py-4">
+              <div className="flex gap-2.5 rounded-lg bg-brand-50 px-3.5 py-3 text-sm text-brand-800">
+                <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>
+                  List every subject on the paper sheet below, <strong>left to right in the same order the columns appear</strong> — subject 1 here
+                  must be the leftmost subject on the sheet, subject 2 the next one, and so on. We read each student's row of marks in that same
+                  order, so a mismatch here means marks land against the wrong subject.
+                </p>
+              </div>
+
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
                 <div>
                   <Label>Semester</Label>
-                  <Input type="number" min={1} max={8} value={semester} onChange={(e) => setSemester(e.target.value)} />
+                  <Select value={semester} onChange={(e) => setSemester(e.target.value)}>
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                      <option key={n} value={n}>
+                        Semester {n}
+                      </option>
+                    ))}
+                  </Select>
                 </div>
                 <div>
                   <Label>Source Type</Label>
@@ -169,35 +187,58 @@ export default function ScanImport({ base: _base }: { base: string }) {
                       </option>
                     ))}
                   </Select>
+                  <p className="mt-1 text-xs text-slate-400">MAIN for a regular semester exam; the others only for a re-evaluation/supplementary sheet.</p>
                 </div>
               </div>
 
               <div>
-                <Label>Subjects, in the order they appear on the sheet</Label>
+                <Label>Subjects, left to right as columns on the sheet</Label>
+                <div className="hidden gap-2 px-1 pb-1 text-xs font-medium text-slate-400 sm:flex">
+                  <span className="w-7 shrink-0" />
+                  <span className="flex-1">Subject code (required)</span>
+                  <span className="flex-[2]">Subject name (optional)</span>
+                  <span className="w-20 shrink-0">Credits</span>
+                  <span className="w-8 shrink-0" />
+                </div>
                 <div className="space-y-2">
-                  {subjects.map((s, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <Input placeholder="Code, e.g. 23CS4PCOPS" value={s.code} onChange={(e) => updateSubject(i, { code: e.target.value })} className="flex-1" />
-                      <Input placeholder="Name (optional)" value={s.name} onChange={(e) => updateSubject(i, { name: e.target.value })} className="flex-[2]" />
-                      <Input
-                        type="number"
-                        min={0}
-                        max={10}
-                        value={s.credits}
-                        onChange={(e) => updateSubject(i, { credits: parseInt(e.target.value, 10) || 0 })}
-                        className="w-20"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeSubject(i)}
-                        disabled={subjects.length === 1}
-                        aria-label={`Remove subject ${i + 1}`}
-                        className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ))}
+                  {subjects.map((s, i) => {
+                    const missingCode = triedExtract && !s.code.trim();
+                    return (
+                      <div key={i} className="flex items-center gap-2">
+                        <span
+                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                            missingCode ? "bg-red-100 text-red-600" : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {i + 1}
+                        </span>
+                        <Input
+                          placeholder="e.g. 23CS4PCOPS"
+                          value={s.code}
+                          onChange={(e) => updateSubject(i, { code: e.target.value })}
+                          className={`flex-1 ${missingCode ? "border-red-400 focus:border-red-500 focus:ring-red-500/10" : ""}`}
+                        />
+                        <Input placeholder="Name (optional)" value={s.name} onChange={(e) => updateSubject(i, { name: e.target.value })} className="flex-[2]" />
+                        <Input
+                          type="number"
+                          min={0}
+                          max={10}
+                          value={s.credits}
+                          onChange={(e) => updateSubject(i, { credits: parseInt(e.target.value, 10) || 0 })}
+                          className="w-20"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeSubject(i)}
+                          disabled={subjects.length === 1}
+                          aria-label={`Remove subject ${i + 1}`}
+                          className="shrink-0 rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
                 <Button type="button" variant="secondary" size="sm" icon={Plus} onClick={addSubject} className="mt-2">
                   Add subject
@@ -207,11 +248,14 @@ export default function ScanImport({ base: _base }: { base: string }) {
           </Card>
 
           <Card>
-            <CardHeader title="2. Upload the Sheet" subtitle="PDF (with a real text layer) or an image (JPEG/PNG/WEBP) — images are OCR'd automatically." />
+            <CardHeader
+              title="2. Upload the Sheet"
+              subtitle="PDF (with a real text layer) or an image (JPEG/PNG/WEBP) — images are OCR'd automatically. Nothing here is written to the database yet — you'll review every row first."
+            />
             <div className="space-y-4 px-5 py-4">
               <FileDropzone file={file} onChange={setFile} accept=".pdf,image/jpeg,image/png,image/webp" hint="PDF, JPEG, PNG, or WEBP" />
               <Button onClick={handleExtract} disabled={!file || extracting} icon={ScanLine}>
-                {extracting ? "Reading..." : "Extract"}
+                {extracting ? "Reading..." : `Extract with ${subjects.length} subject${subjects.length === 1 ? "" : "s"}`}
               </Button>
             </div>
           </Card>
