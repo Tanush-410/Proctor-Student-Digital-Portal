@@ -5,6 +5,7 @@ import { allocateStudents, normaliseKeys, parseSheet, requireEmailColumn } from 
 import { safeRouter } from "../../lib/asyncSafeRouter";
 import { logAudit } from "../../lib/audit";
 import { notify } from "../../lib/notify";
+import { CLUSTERS } from "../../lib/cluster";
 
 async function notifyAdminsOfExceptions(count: number, batchId: number, sourceType: string) {
   if (count === 0) return;
@@ -19,6 +20,10 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 
 // POST /admin/upload/class-list — upload and merge a class-list sheet.
 // Columns: usn, name, email, section, proctor_short_code
+// Body field `cluster` (A-E, optional) is which cluster this file's proctors
+// belong to — used to disambiguate a short code/name reused across two
+// clusters, and to backfill the cluster tag onto any matched proctor that
+// doesn't have one yet (see allocateStudents in ./engine).
 ingestionRouter.post(
   "/upload/class-list",
   requireAuth,
@@ -26,6 +31,12 @@ ingestionRouter.post(
   upload.single("file"),
   async (req: AuthedRequest, res) => {
     if (!req.file) return res.status(400).json({ error: "file is required" });
+
+    const clusterInput = typeof req.body?.cluster === "string" ? req.body.cluster.trim().toUpperCase() : "";
+    if (clusterInput && !(CLUSTERS as readonly string[]).includes(clusterInput)) {
+      return res.status(400).json({ error: `Invalid cluster "${clusterInput}" — must be one of ${CLUSTERS.join(", ")}` });
+    }
+    const cluster = clusterInput || null;
 
     const { rows, errors: parseErrors } = parseSheet(req.file.buffer);
     const normalised = normaliseKeys(rows);
@@ -44,11 +55,12 @@ ingestionRouter.post(
       [],
       [...parseErrors, ...rowErrors],
       req.auth!.facultyId!,
-      "CLASS_LIST"
+      "CLASS_LIST",
+      cluster
     );
 
     await notifyAdminsOfExceptions(summary.exceptions, summary.batchId, "Class-list");
-    logAudit(req, "UPLOAD", "ImportBatch", String(summary.batchId), { sourceType: "CLASS_LIST", created: summary.created, updated: summary.updated });
+    logAudit(req, "UPLOAD", "ImportBatch", String(summary.batchId), { sourceType: "CLASS_LIST", created: summary.created, updated: summary.updated, cluster });
     res.json(summary);
   }
 );

@@ -13,6 +13,7 @@ export interface FacultyProfile {
   phone: string | null;
   email: string;
   role: Role;
+  cluster: string | null;
 }
 
 export interface StudentProfile {

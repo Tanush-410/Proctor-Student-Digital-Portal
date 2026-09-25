@@ -38,8 +38,14 @@ function buildTextPdf(lines: string[]): Promise<Buffer> {
 
 beforeAll(async () => {
   // Tables in FK-safe delete order.
+  await prisma.circularRecipient.deleteMany();
+  await prisma.circular.deleteMany();
+  await prisma.markRequest.deleteMany();
+  await prisma.subjectAttendance.deleteMany();
+  await prisma.accolade.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.notification.deleteMany();
+  await prisma.message.deleteMany();
   await prisma.importException.deleteMany();
   await prisma.importBatch.deleteMany();
   await prisma.activityPointClaim.deleteMany();

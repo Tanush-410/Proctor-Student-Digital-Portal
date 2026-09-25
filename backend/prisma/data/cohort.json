@@ -11,7 +11,8 @@
       "telecomNo": null,
       "phone": null,
       "email": "shuba.rao@bmsce.ac.in",
-      "role": "ADMIN"
+      "role": "ADMIN",
+      "cluster": "A"
     },
     {
       "facultyId": 5,
@@ -22,7 +23,8 @@
       "telecomNo": null,
       "phone": "9740814006",
       "email": "praveen.cse@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 6,
@@ -33,7 +35,8 @@
       "telecomNo": null,
       "phone": "9080997197",
       "email": "megavalli.cse@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 7,
@@ -44,7 +47,8 @@
       "telecomNo": null,
       "phone": "8861240680",
       "email": "ambuja.cse@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 8,
@@ -55,7 +59,8 @@
       "telecomNo": null,
       "phone": "9845644401",
       "email": "amithpradhaan.cse@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 9,
@@ -66,7 +71,8 @@
       "telecomNo": null,
       "phone": "9731278521",
       "email": "jakkali.cse@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 10,
@@ -77,7 +83,8 @@
       "telecomNo": null,
       "phone": "8095788842",
       "email": "kanchanamd.cse@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 11,
@@ -88,7 +95,8 @@
       "telecomNo": null,
       "phone": "9900502934",
       "email": "kayarvizhyn.cse@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 12,
@@ -99,7 +107,8 @@
       "telecomNo": null,
       "phone": "9448829422",
       "email": "sudhamanimv.ise@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 13,
@@ -110,7 +119,8 @@
       "telecomNo": null,
       "phone": "9739903844",
       "email": "nandhiniv.cse@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 14,
@@ -121,7 +131,8 @@
       "telecomNo": null,
       "phone": "9901605295",
       "email": "pooja.cse@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 15,
@@ -132,7 +143,8 @@
       "telecomNo": null,
       "phone": "9844009621",
       "email": "pradeep.cse@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 16,
@@ -143,7 +155,8 @@
       "telecomNo": null,
       "phone": "9482205216",
       "email": "ramyakm.cse@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 17,
@@ -154,7 +167,8 @@
       "telecomNo": null,
       "phone": "9731219890",
       "email": "rashmi.cse@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 18,
@@ -165,7 +179,8 @@
       "telecomNo": null,
       "phone": "9744564485",
       "email": "reznis.cse@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 19,
@@ -176,7 +191,8 @@
       "telecomNo": null,
       "phone": "8884069722",
       "email": "roopashree.cse@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 20,
@@ -187,7 +203,8 @@
       "telecomNo": null,
       "phone": "9972172175",
       "email": "shashikala.cse@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 21,
@@ -198,7 +215,8 @@
       "telecomNo": null,
       "phone": "9986310355",
       "email": "snehasb.cse@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 22,
@@ -209,7 +227,8 @@
       "telecomNo": null,
       "phone": "9353069066",
       "email": "sonikasharma.cse@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 23,
@@ -220,7 +239,8 @@
       "telecomNo": null,
       "phone": null,
       "email": "sreelathar.cse@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 24,
@@ -231,7 +251,8 @@
       "telecomNo": null,
       "phone": "8762742909",
       "email": "umadevi.cse@bmsce.ac.in",
-      "role": "PROCTOR"
+      "role": "PROCTOR",
+      "cluster": "A"
     },
     {
       "facultyId": 25,
@@ -242,7 +263,8 @@
       "telecomNo": null,
       "phone": "9008928790",
       "email": "kavithas.cse@bmsce.ac.in",
-      "role": "ADMIN"
+      "role": "ADMIN",
+      "cluster": "A"
     }
   ],
   "students": [

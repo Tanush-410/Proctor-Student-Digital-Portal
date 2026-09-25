@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { AlertTriangle, GraduationCap, History, Users } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 import { api } from "../../api/client";
-import { Badge, Card, CardHeader, EmptyState, ResponsiveTable, SkeletonRows, StatTile } from "../../components/ui";
+import { Badge, Card, CardHeader, EmptyState, ResponsiveTable, Select, SkeletonRows, StatTile } from "../../components/ui";
 import { DashboardHero } from "../../components/DashboardHero";
 
 interface Batch {
@@ -21,15 +21,21 @@ export default function AdminDashboard() {
   const [facultyCount, setFacultyCount] = useState<number | null>(null);
   const [exceptionCount, setExceptionCount] = useState<number | null>(null);
   const [batches, setBatches] = useState<Batch[] | null>(null);
+  const [allClusters, setAllClusters] = useState(false);
 
   useEffect(() => {
-    api.get("/students/count").then((r) => setStudentCount(r.count));
-    api.get("/proctors/count").then((r) => setFacultyCount(r.count));
+    const scope = allClusters ? "?allClusters=true" : "";
+    api.get(`/students/count${scope}`).then((r) => setStudentCount(r.count));
+    api.get(`/proctors/count${scope}`).then((r) => setFacultyCount(r.count));
+  }, [allClusters]);
+
+  useEffect(() => {
     api.get("/admin/import-exceptions?resolved=false").then((r) => setExceptionCount(r.length));
     api.get("/admin/import-batches").then(setBatches);
   }, []);
 
   const firstName = auth?.profile.name.replace(/^(Dr\.|Prof\.)\s*/, "").split(" ")[0];
+  const myCluster = auth?.profile && "cluster" in auth.profile ? auth.profile.cluster : null;
 
   return (
     <div className="space-y-6">
@@ -38,6 +44,15 @@ export default function AdminDashboard() {
         title={`Welcome back, ${firstName}`}
         subtitle="Department-wide overview across ingestion, results, and proctee allocation."
       />
+
+      {myCluster && (
+        <div className="flex justify-end">
+          <Select value={allClusters ? "all" : "mine"} onChange={(e) => setAllClusters(e.target.value === "all")} className="w-48 py-1.5 text-sm">
+            <option value="mine">My cluster ({myCluster})</option>
+            <option value="all">All clusters</option>
+          </Select>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <StatTile index={0} label="Students" value={studentCount ?? 0} tone="blue" icon={GraduationCap} loading={studentCount === null} />

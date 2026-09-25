@@ -2,9 +2,12 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Pencil, Search, UserPlus, Users } from "lucide-react";
 import { api, ApiError } from "../../api/client";
+import { useAuth } from "../../auth/AuthContext";
 import { useToast } from "../../components/Toast";
 import { Modal } from "../../components/Modal";
 import { Avatar, Badge, Button, Card, CardHeader, EmptyState, IconButton, Input, Label, ResponsiveTable, Select, SkeletonAvatarRows } from "../../components/ui";
+
+const CLUSTERS = ["A", "B", "C", "D", "E"] as const;
 
 interface Faculty {
   facultyId: number;
@@ -16,6 +19,7 @@ interface Faculty {
   phone: string | null;
   email: string;
   role: "ADMIN" | "PROCTOR";
+  cluster: string | null;
 }
 
 interface FacultyForm {
@@ -27,25 +31,29 @@ interface FacultyForm {
   phone: string;
   email: string;
   role: "ADMIN" | "PROCTOR";
+  cluster: string;
 }
 
-const emptyForm: FacultyForm = { staffId: "", name: "", shortCode: "", cabinNo: "", telecomNo: "", phone: "", email: "", role: "PROCTOR" };
+const emptyForm: FacultyForm = { staffId: "", name: "", shortCode: "", cabinNo: "", telecomNo: "", phone: "", email: "", role: "PROCTOR", cluster: "" };
 
 export default function AdminFaculty() {
   const toast = useToast();
+  const { auth } = useAuth();
+  const myCluster = auth?.profile && "cluster" in auth.profile ? auth.profile.cluster : null;
   const [faculty, setFaculty] = useState<Faculty[] | null>(null);
   const [q, setQ] = useState("");
+  const [allClusters, setAllClusters] = useState(false);
   const [editing, setEditing] = useState<Faculty | null>(null);
   const [form, setForm] = useState<FacultyForm>(emptyForm);
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function load() {
-    api.get("/proctors").then(setFaculty);
+  function load(showAll: boolean) {
+    api.get(`/proctors${showAll ? "?allClusters=true" : ""}`).then(setFaculty);
   }
 
-  useEffect(load, []);
+  useEffect(() => load(allClusters), [allClusters]);
 
   const filtered = useMemo(() => {
     if (!faculty) return [];
@@ -72,6 +80,7 @@ export default function AdminFaculty() {
       phone: f.phone ?? "",
       email: f.email,
       role: f.role === "ADMIN" ? "ADMIN" : "PROCTOR",
+      cluster: f.cluster ?? "",
     });
     setShowForm(true);
     setError(null);
@@ -82,15 +91,16 @@ export default function AdminFaculty() {
     setBusy(true);
     setError(null);
     try {
+      const payload = { ...form, cluster: form.cluster || null };
       if (editing) {
-        await api.patch(`/faculty/${editing.facultyId}`, form);
+        await api.patch(`/faculty/${editing.facultyId}`, payload);
         toast.success("Faculty updated", `${form.name}'s record was saved.`);
       } else {
-        await api.post("/faculty", form);
+        await api.post("/faculty", payload);
         toast.success("Faculty onboarded", `${form.name} can now log in with ${form.email}.`);
       }
       setShowForm(false);
-      load();
+      load(allClusters);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to save faculty");
     } finally {
@@ -137,6 +147,17 @@ export default function AdminFaculty() {
               </Select>
             </div>
             <div>
+              <Label>Cluster</Label>
+              <Select value={form.cluster} onChange={(e) => setForm({ ...form, cluster: e.target.value })}>
+                <option value="">Unassigned</option>
+                {CLUSTERS.map((c) => (
+                  <option key={c} value={c}>
+                    Cluster {c}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div>
               <Label>Phone</Label>
               <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </div>
@@ -164,11 +185,24 @@ export default function AdminFaculty() {
       <Card>
         <CardHeader
           title={faculty === null ? "Loading..." : `${faculty.length} faculty`}
+          subtitle={
+            !allClusters && myCluster
+              ? `Showing Cluster ${myCluster} — your own cluster`
+              : !allClusters && !myCluster
+                ? "You aren't tagged into a cluster yet — showing everyone"
+                : "Showing every cluster"
+          }
           icon={Users}
           action={
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-              <Input placeholder="Filter..." value={q} onChange={(e) => setQ(e.target.value)} className="w-44 py-1.5 pl-8 text-sm" />
+            <div className="flex items-center gap-2">
+              <Select value={allClusters ? "all" : "mine"} onChange={(e) => setAllClusters(e.target.value === "all")} className="w-40 py-1.5 text-sm">
+                <option value="mine">My cluster</option>
+                <option value="all">All clusters</option>
+              </Select>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                <Input placeholder="Filter..." value={q} onChange={(e) => setQ(e.target.value)} className="w-44 py-1.5 pl-8 text-sm" />
+              </div>
             </div>
           }
         />
@@ -185,6 +219,7 @@ export default function AdminFaculty() {
                     <th className="px-5 py-2.5 font-medium">Name</th>
                     <th className="px-5 py-2.5 font-medium">Short Code</th>
                     <th className="px-5 py-2.5 font-medium">Role</th>
+                    <th className="px-5 py-2.5 font-medium">Cluster</th>
                     <th className="px-5 py-2.5 font-medium">Cabin</th>
                     <th className="px-5 py-2.5 font-medium">Contact</th>
                     <th className="px-5 py-2.5 font-medium" />
@@ -203,6 +238,7 @@ export default function AdminFaculty() {
                       <td className="px-5 py-2.5">
                         <Badge tone={f.role === "ADMIN" ? "blue" : "slate"}>{f.role}</Badge>
                       </td>
+                      <td className="px-5 py-2.5 text-slate-600">{f.cluster ? `Cluster ${f.cluster}` : "-"}</td>
                       <td className="px-5 py-2.5 text-slate-600">{f.cabinNo ?? "-"}</td>
                       <td className="px-5 py-2.5 text-slate-600">{f.phone ?? f.email}</td>
                       <td className="px-5 py-2.5 text-right">
