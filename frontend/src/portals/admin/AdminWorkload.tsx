@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Scale, UserX, Users } from "lucide-react";
 import { api } from "../../api/client";
-import { Avatar, Badge, Card, CardHeader, EmptyState, MobileListRow, PageSpinner, ResponsiveTable, StatTile } from "../../components/ui";
+import { Avatar, Badge, Card, CardHeader, EmptyState, MobileListRow, PageSpinner, ResponsiveTable, Select, StatTile } from "../../components/ui";
 import { BarChart } from "../../components/charts";
 
 interface ProctorLoad {
@@ -22,10 +22,11 @@ interface Workload {
 
 export default function AdminWorkload() {
   const [data, setData] = useState<Workload | null>(null);
+  const [allClusters, setAllClusters] = useState(false);
 
   useEffect(() => {
-    api.get("/admin/workload").then(setData);
-  }, []);
+    api.get(`/admin/workload${allClusters ? "?allClusters=true" : ""}`).then(setData);
+  }, [allClusters]);
 
   if (!data) return <PageSpinner />;
 
@@ -33,9 +34,15 @@ export default function AdminWorkload() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-slate-900">Faculty Workload</h1>
-        <p className="mt-1 text-sm text-slate-500">Proctee-count balance across proctors — reassign from a student's detail page if it's lopsided.</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900">Faculty Workload</h1>
+          <p className="mt-1 text-sm text-slate-500">Proctee-count balance across proctors — reassign from a student's detail page if it's lopsided.</p>
+        </div>
+        <Select value={allClusters ? "all" : "mine"} onChange={(e) => setAllClusters(e.target.value === "all")} className="w-40 py-1.5 text-sm">
+          <option value="mine">My cluster</option>
+          <option value="all">All clusters</option>
+        </Select>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

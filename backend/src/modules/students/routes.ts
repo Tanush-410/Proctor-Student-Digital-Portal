@@ -5,6 +5,7 @@ import { safeRouter } from "../../lib/asyncSafeRouter";
 import { logAudit } from "../../lib/audit";
 import { notify } from "../../lib/notify";
 import { computeCGPA, getBacklogSubjects, resolvePrecedence } from "../results/engine";
+import { callerCluster } from "../../lib/cluster";
 
 export const studentsRouter = safeRouter();
 
@@ -15,15 +16,23 @@ function canView(auth: NonNullable<AuthedRequest["auth"]>, student: { proctorId:
   return false;
 }
 
-// GET /students — list/search (Admin, Proctor only). Proctor sees own proctees by default.
+// GET /students — list/search (Admin, Proctor only). Proctor sees own
+// proctees by default (?mine=true). Admin defaults to their own cluster's
+// students (?allClusters=true opts out) — a student's cluster is inherited
+// from their proctor, since clusters are tagged per-proctor, not per-student.
 // ?limit=&offset= cap an unscoped call (e.g. Admin browsing everyone) at a sane
 // page size instead of shipping every row — a proctor's own list (?mine=true)
 // is naturally small (tens of students) so the default limit never engages for it.
 studentsRouter.get("/", requireAuth, requireRole("ADMIN", "PROCTOR"), async (req: AuthedRequest, res) => {
   const q = (req.query.q as string | undefined)?.trim();
   const mineOnly = req.query.mine === "true";
+  const allClusters = req.query.allClusters === "true";
   const where: any = {};
   if (mineOnly && req.auth!.role === "PROCTOR") where.proctorId = req.auth!.facultyId;
+  if (req.auth!.role === "ADMIN" && !allClusters) {
+    const cluster = await callerCluster(req.auth!.facultyId);
+    if (cluster) where.proctor = { cluster };
+  }
   if (q) where.OR = [{ name: { contains: q, mode: "insensitive" } }, { usn: { contains: q, mode: "insensitive" } }];
 
   const limit = Math.min(parseInt(String(req.query.limit ?? "100"), 10) || 100, 500);
@@ -35,8 +44,15 @@ studentsRouter.get("/", requireAuth, requireRole("ADMIN", "PROCTOR"), async (req
 
 // GET /students/count — total count for the Admin dashboard stat tile, without
 // shipping all 3000 student rows over the wire just to read .length client-side.
-studentsRouter.get("/count", requireAuth, requireRole("ADMIN", "PROCTOR"), async (_req: AuthedRequest, res) => {
-  const count = await prisma.student.count();
+// Same cluster default as GET /students.
+studentsRouter.get("/count", requireAuth, requireRole("ADMIN", "PROCTOR"), async (req: AuthedRequest, res) => {
+  const allClusters = req.query.allClusters === "true";
+  const where: any = {};
+  if (req.auth!.role === "ADMIN" && !allClusters) {
+    const cluster = await callerCluster(req.auth!.facultyId);
+    if (cluster) where.proctor = { cluster };
+  }
+  const count = await prisma.student.count({ where });
   res.json({ count });
 });
 

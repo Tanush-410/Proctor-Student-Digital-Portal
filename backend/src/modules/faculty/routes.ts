@@ -5,10 +5,17 @@ import { AuthedRequest, requireAuth, requireRole } from "../../middleware/sessio
 import { safeRouter } from "../../lib/asyncSafeRouter";
 import { logAudit } from "../../lib/audit";
 import { computeCGPA, getBacklogSubjects, resolvePrecedence } from "../results/engine";
+import { callerCluster } from "../../lib/cluster";
 
 export const facultyRouter = safeRouter();
 
-// GET /proctors — list/search the faculty directory.
+// GET /proctors — list/search the faculty directory. An Admin/HOD defaults to
+// their own cluster (?allClusters=true opts out) since each cluster has its
+// own HOD who should land on their own proctors first — but every cluster's
+// data is still one department, so nothing stops them viewing another
+// cluster's roster too. A Proctor session is unfiltered — the faculty
+// directory has always been broadly readable to proctors (Section 9), and
+// this feature is specifically about admin/HOD scoping.
 // A Student session only ever sees their own proctor's entry (Section 9).
 facultyRouter.get("/proctors", requireAuth, requireRole("ADMIN", "PROCTOR", "STUDENT"), async (req: AuthedRequest, res) => {
   if (req.auth!.role === "STUDENT") {
@@ -17,24 +24,34 @@ facultyRouter.get("/proctors", requireAuth, requireRole("ADMIN", "PROCTOR", "STU
   }
 
   const q = (req.query.q as string | undefined)?.trim();
-  const faculty = await prisma.faculty.findMany({
-    where: q
-      ? {
-          OR: [
-            { name: { contains: q, mode: "insensitive" } },
-            { shortCode: { contains: q, mode: "insensitive" } },
-            { email: { contains: q, mode: "insensitive" } },
-          ],
-        }
-      : undefined,
-    orderBy: { name: "asc" },
-  });
+  const allClusters = req.query.allClusters === "true";
+  const where: Prisma.FacultyWhereInput = {};
+  if (q) {
+    where.OR = [
+      { name: { contains: q, mode: "insensitive" } },
+      { shortCode: { contains: q, mode: "insensitive" } },
+      { email: { contains: q, mode: "insensitive" } },
+    ];
+  }
+  if (req.auth!.role === "ADMIN" && !allClusters) {
+    const cluster = await callerCluster(req.auth!.facultyId);
+    if (cluster) where.cluster = cluster;
+  }
+
+  const faculty = await prisma.faculty.findMany({ where, orderBy: { name: "asc" } });
   res.json(faculty);
 });
 
 // GET /proctors/count — total count for the Admin dashboard stat tile.
-facultyRouter.get("/proctors/count", requireAuth, requireRole("ADMIN", "PROCTOR"), async (_req: AuthedRequest, res) => {
-  const count = await prisma.faculty.count();
+// Same cluster default as GET /proctors.
+facultyRouter.get("/proctors/count", requireAuth, requireRole("ADMIN", "PROCTOR"), async (req: AuthedRequest, res) => {
+  const allClusters = req.query.allClusters === "true";
+  const where: Prisma.FacultyWhereInput = {};
+  if (req.auth!.role === "ADMIN" && !allClusters) {
+    const cluster = await callerCluster(req.auth!.facultyId);
+    if (cluster) where.cluster = cluster;
+  }
+  const count = await prisma.faculty.count({ where });
   res.json({ count });
 });
 
@@ -126,13 +143,22 @@ facultyRouter.get("/proctors/:id/analytics", requireAuth, requireRole("ADMIN", "
   });
 });
 
-// GET /admin/workload — proctee-count balance across all proctors, for the
-// HOD to spot lopsided loads. Admin-only; a Proctor already sees their own
-// count via /proctors/:id/analytics.
-facultyRouter.get("/admin/workload", requireAuth, requireRole("ADMIN"), async (_req: AuthedRequest, res) => {
-  const proctors = await prisma.faculty.findMany({ where: { role: "PROCTOR" }, orderBy: { name: "asc" } });
+// GET /admin/workload — proctee-count balance across proctors, for the HOD
+// to spot lopsided loads. Defaults to the caller's own cluster
+// (?allClusters=true opts out), same as GET /proctors. Admin-only; a Proctor
+// already sees their own count via /proctors/:id/analytics.
+facultyRouter.get("/admin/workload", requireAuth, requireRole("ADMIN"), async (req: AuthedRequest, res) => {
+  const allClusters = req.query.allClusters === "true";
+  const where: Prisma.FacultyWhereInput = { role: "PROCTOR" };
+  if (!allClusters) {
+    const cluster = await callerCluster(req.auth!.facultyId);
+    if (cluster) where.cluster = cluster;
+  }
+  const proctors = await prisma.faculty.findMany({ where, orderBy: { name: "asc" } });
   const counts = await prisma.student.groupBy({ by: ["proctorId"], _count: { usn: true } });
   const countByProctor = new Map(counts.filter((c) => c.proctorId !== null).map((c) => [c.proctorId as number, c._count.usn]));
+  // Unassigned proctees have no proctor to inherit a cluster from, so this
+  // count is always department-wide regardless of cluster scope.
   const unassignedCount = counts.find((c) => c.proctorId === null)?._count.usn ?? 0;
 
   const rows = proctors.map((p) => ({
@@ -153,17 +179,24 @@ facultyRouter.get("/admin/workload", requireAuth, requireRole("ADMIN"), async (_
   });
 });
 
-// GET /admin/analytics — department-wide rollup of the same effective-results
-// engine used per-proctor (Section 8.2), aggregated across every student:
-// overall CGPA/backlog/at-risk numbers plus a section-wise and semester-wise
-// breakdown, for the HOD dashboard.
-facultyRouter.get("/admin/analytics", requireAuth, requireRole("ADMIN"), async (_req: AuthedRequest, res) => {
-  const students = await prisma.student.findMany();
+// GET /admin/analytics — rollup of the same effective-results engine used
+// per-proctor (Section 8.2), aggregated across students: overall
+// CGPA/backlog/at-risk numbers plus a section-wise and semester-wise
+// breakdown, for the HOD dashboard. Defaults to the caller's own cluster
+// (?allClusters=true opts out for the department-wide rollup).
+facultyRouter.get("/admin/analytics", requireAuth, requireRole("ADMIN"), async (req: AuthedRequest, res) => {
+  const allClusters = req.query.allClusters === "true";
+  const where: Prisma.StudentWhereInput = {};
+  if (!allClusters) {
+    const cluster = await callerCluster(req.auth!.facultyId);
+    if (cluster) where.proctor = { cluster };
+  }
+  const students = await prisma.student.findMany({ where });
   if (students.length === 0) {
     return res.json({ studentCount: 0, avgCgpa: null, backlogCount: 0, atRiskCount: 0, bySection: [], bySemester: [] });
   }
 
-  const allRecords = await prisma.resultRecord.findMany();
+  const allRecords = await prisma.resultRecord.findMany({ where: { usn: { in: students.map((s) => s.usn) } } });
   const recordsByUsn = new Map<string, typeof allRecords>();
   for (const r of allRecords) {
     const arr = recordsByUsn.get(r.usn) ?? [];
@@ -228,6 +261,8 @@ const facultySchema = z.object({
   cabinNo: z.string().optional(),
   telecomNo: z.string().optional(),
   phone: z.string().optional(),
+  // A/B/C/D/E departmental cluster; null means unassigned.
+  cluster: z.enum(["A", "B", "C", "D", "E"]).nullable().optional(),
 });
 
 // POST /faculty — onboard a new proctor/HOD. Not in the original design doc's

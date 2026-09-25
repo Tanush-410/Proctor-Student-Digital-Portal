@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, CalendarCheck, GraduationCap, Layers, Users, XCircle } from "lucide-react";
 import { api } from "../../api/client";
-import { Card, CardHeader, PageSpinner, ResponsiveTable, StatRowCard, StatTile } from "../../components/ui";
+import { Card, CardHeader, PageSpinner, ResponsiveTable, Select, StatRowCard, StatTile } from "../../components/ui";
 import { BarChart } from "../../components/charts";
 
 interface GroupStat {
@@ -32,19 +32,26 @@ interface AttendanceAnalytics {
 export default function AdminAnalytics() {
   const [data, setData] = useState<Analytics | null>(null);
   const [attendance, setAttendance] = useState<AttendanceAnalytics | null>(null);
+  const [allClusters, setAllClusters] = useState(false);
 
   useEffect(() => {
-    api.get("/admin/analytics").then(setData);
+    api.get(`/admin/analytics${allClusters ? "?allClusters=true" : ""}`).then(setData);
     api.get("/admin/attendance/analytics").then(setAttendance);
-  }, []);
+  }, [allClusters]);
 
   if (!data) return <PageSpinner />;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-slate-900">Department Analytics</h1>
-        <p className="mt-1 text-sm text-slate-500">CGPA, backlogs, and at-risk counts across every student — the per-proctor rollup, aggregated.</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-slate-900">Department Analytics</h1>
+          <p className="mt-1 text-sm text-slate-500">CGPA, backlogs, and at-risk counts across every student — the per-proctor rollup, aggregated.</p>
+        </div>
+        <Select value={allClusters ? "all" : "mine"} onChange={(e) => setAllClusters(e.target.value === "all")} className="w-40 py-1.5 text-sm">
+          <option value="mine">My cluster</option>
+          <option value="all">All clusters</option>
+        </Select>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

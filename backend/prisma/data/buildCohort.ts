@@ -25,9 +25,9 @@ const clean = (v: unknown) => {
 
 // --- faculty (from the class list "Proctor" sheet + the user-supplied HOD) ---
 const faculty = [
-  { facultyId: 4, staffId: "ADMIN001", name: "Shuba V Rao", shortCode: "SVR", cabinNo: null, telecomNo: null, phone: null, email: "shuba.rao@bmsce.ac.in", role: "ADMIN" },
-  { facultyId: 5, staffId: "FAC-PN", name: "Praveen N", shortCode: "PN", cabinNo: null, telecomNo: null, phone: "9740814006", email: "praveen.cse@bmsce.ac.in", role: "PROCTOR" },
-  { facultyId: 6, staffId: "FAC-MVM", name: "Megavalli M", shortCode: "MVM", cabinNo: null, telecomNo: null, phone: "9080997197", email: "megavalli.cse@bmsce.ac.in", role: "PROCTOR" },
+  { facultyId: 4, staffId: "ADMIN001", name: "Shuba V Rao", shortCode: "SVR", cabinNo: null, telecomNo: null, phone: null, email: "shuba.rao@bmsce.ac.in", role: "ADMIN", cluster: "A" },
+  { facultyId: 5, staffId: "FAC-PN", name: "Praveen N", shortCode: "PN", cabinNo: null, telecomNo: null, phone: "9740814006", email: "praveen.cse@bmsce.ac.in", role: "PROCTOR", cluster: "A" },
+  { facultyId: 6, staffId: "FAC-MVM", name: "Megavalli M", shortCode: "MVM", cabinNo: null, telecomNo: null, phone: "9080997197", email: "megavalli.cse@bmsce.ac.in", role: "PROCTOR", cluster: "A" },
 ];
 const facultyIdByCode: Record<string, number> = { PN: 5, MVM: 6 };
 

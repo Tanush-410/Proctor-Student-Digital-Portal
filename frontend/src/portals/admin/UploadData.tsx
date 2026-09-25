@@ -3,7 +3,9 @@ import { AlertTriangle, Users, UserPlus } from "lucide-react";
 import { api, ApiError } from "../../api/client";
 import { useToast } from "../../components/Toast";
 import { FileDropzone } from "../../components/FileDropzone";
-import { Button, Badge, Card, CardHeader } from "../../components/ui";
+import { Button, Badge, Card, CardHeader, Label, Select } from "../../components/ui";
+
+const CLUSTERS = ["A", "B", "C", "D", "E"] as const;
 
 interface Summary {
   batchId?: number;
@@ -19,15 +21,18 @@ function UploadForm({
   columns,
   endpoint,
   icon,
+  showCluster,
 }: {
   title: string;
   subtitle: string;
   columns: string;
   endpoint: string;
   icon: typeof Users;
+  showCluster?: boolean;
 }) {
   const toast = useToast();
   const [file, setFile] = useState<File | null>(null);
+  const [cluster, setCluster] = useState("");
   const [busy, setBusy] = useState(false);
   const [summary, setSummary] = useState<Summary | null>(null);
 
@@ -39,6 +44,7 @@ function UploadForm({
     try {
       const form = new FormData();
       form.append("file", file);
+      if (showCluster && cluster) form.append("cluster", cluster);
       const res = await api.upload(endpoint, form);
       setSummary(res);
       const total = (res.created ?? 0) + (res.updated ?? 0);
@@ -58,7 +64,23 @@ function UploadForm({
         <p className="text-xs text-slate-500">
           Expected columns: <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-600">{columns}</code>
         </p>
-        <FileDropzone file={file} onChange={setFile} accept=".csv,.xlsx,.xls" hint="CSV, XLSX, or XLS" />
+        {showCluster && (
+          <div className="max-w-xs">
+            <Label>Cluster this file belongs to</Label>
+            <Select value={cluster} onChange={(e) => setCluster(e.target.value)}>
+              <option value="">Auto-detect from each proctor's existing tag</option>
+              {CLUSTERS.map((c) => (
+                <option key={c} value={c}>
+                  Cluster {c}
+                </option>
+              ))}
+            </Select>
+            <p className="mt-1 text-xs text-slate-500">
+              Used to tell apart a short code/name reused across clusters, and to tag any proctor in this file who isn't assigned to a cluster yet.
+            </p>
+          </div>
+        )}
+        <FileDropzone file={file} onChange={setFile} accept=".csv,.xlsx,.xls" hint="CSV, XLSX, or XLS — every sheet/tab in the file is read" />
         <Button type="submit" disabled={!file || busy}>
           {busy ? "Uploading & merging..." : "Upload & Merge"}
         </Button>
@@ -105,6 +127,7 @@ export default function UploadData() {
         columns="usn, name, email, section, proctor_short_code"
         endpoint="/admin/upload/class-list"
         icon={Users}
+        showCluster
       />
 
       <UploadForm

@@ -32,6 +32,11 @@ model Faculty {
   phone       String?
   email       String   @unique
   role        String   @default("PROCTOR")
+  // A/B/C/D/E — which departmental cluster this faculty member (and, by
+  // inheritance, their proctees) belongs to. Nullable because pre-cluster
+  // faculty rows have none yet; unscoped faculty are simply invisible to a
+  // cluster-scoped admin view until tagged.
+  cluster     String?
 
   proctees        Student[]             @relation("ProctorStudents")
   ptmRecords      PtmRecord[]

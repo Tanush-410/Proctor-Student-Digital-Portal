@@ -37,6 +37,51 @@ describe("parseSheet", () => {
     expect(errors).toHaveLength(0);
     expect(rows[0].usn).toBe("1BM22CS004");
   });
+
+  it("skips title/banner rows above the real header (regression: department sheets with a college-name/section banner above row 1)", () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["BMS COLLEGE OF ENGINEERING"],
+      ["DEPARTMENT OF CSE"],
+      ["5th SEM STUDENTS LIST 2026-27"],
+      ["SECTION A -5E-1"],
+      ["USN", "NAME OF THE STUDENT", "E MAIL ID", "PROCTOR"],
+      ["1BM23CS001", "Aarav Sharma", "aarav@bmsce.ac.in", "Dr. RAJESHWARI B S"],
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "5th sem");
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+
+    const { rows, errors } = parseSheet(buf);
+    expect(errors).toHaveLength(0);
+    expect(rows).toEqual([
+      { usn: "1BM23CS001", name: "Aarav Sharma", email: "aarav@bmsce.ac.in", proctor_short_code: "Dr. RAJESHWARI B S" },
+    ]);
+  });
+
+  it("skips blank separator rows within the data", () => {
+    const buf = csvBuffer(["usn,name,email", "1BM22CS001,Aarav Sharma,aarav@bmsce.ac.in", ",,", "1BM22CS002,Rohan Iyer,rohan@bmsce.ac.in"]);
+    const { rows } = parseSheet(buf);
+    expect(rows).toHaveLength(2);
+  });
+
+  it("reads every sheet/tab in the workbook, not just the first (regression: real department files are one tab per semester)", () => {
+    const wb = XLSX.utils.book_new();
+    const sheet5 = XLSX.utils.aoa_to_sheet([
+      ["usn", "name", "email"],
+      ["1BM23CS001", "Aarav Sharma", "aarav@bmsce.ac.in"],
+    ]);
+    const sheet7 = XLSX.utils.aoa_to_sheet([
+      ["usn", "name", "email"],
+      ["1BM21CS009", "Diya Rao", "diya@bmsce.ac.in"],
+    ]);
+    XLSX.utils.book_append_sheet(wb, sheet5, "5th sem");
+    XLSX.utils.book_append_sheet(wb, sheet7, "7th sem");
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+
+    const { rows, errors } = parseSheet(buf);
+    expect(errors).toHaveLength(0);
+    expect(rows.map((r) => r.usn)).toEqual(["1BM23CS001", "1BM21CS009"]);
+  });
 });
 
 describe("normaliseKeys", () => {

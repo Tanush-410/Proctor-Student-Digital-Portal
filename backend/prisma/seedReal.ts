@@ -28,12 +28,28 @@ async function main() {
   const data = JSON.parse(fs.readFileSync(file, "utf8")) as Cohort;
 
   console.log("Wiping existing data...");
+  // Deletion order matters — every table below has a foreign key into
+  // student and/or faculty, so both must be emptied last. This list has
+  // grown as features were added (messages, mark requests, circulars,
+  // subject attendance, audit log, notifications); missing one here just
+  // makes faculty.deleteMany() fail with a P2003 instead of silently losing
+  // data, but keep it in sync with schema.prisma when adding a new relation.
+  await prisma.circularRecipient.deleteMany();
+  await prisma.circular.deleteMany();
+  await prisma.markRequest.deleteMany();
+  await prisma.subjectAttendance.deleteMany();
+  await prisma.attendanceRecord.deleteMany();
+  await prisma.studentNote.deleteMany();
+  await prisma.ptmRecord.deleteMany();
+  await prisma.activityPointClaim.deleteMany();
+  await prisma.resultRecord.deleteMany();
+  await prisma.accolade.deleteMany();
+  await prisma.student.deleteMany();
+  await prisma.message.deleteMany();
+  await prisma.notification.deleteMany();
+  await prisma.auditLog.deleteMany();
   await prisma.importException.deleteMany();
   await prisma.importBatch.deleteMany();
-  await prisma.resultRecord.deleteMany();
-  await prisma.activityPointClaim.deleteMany();
-  await prisma.ptmRecord.deleteMany();
-  await prisma.student.deleteMany();
   await prisma.otpRequest.deleteMany();
   await prisma.session.deleteMany();
   await prisma.faculty.deleteMany();
@@ -51,6 +67,7 @@ async function main() {
         phone: f.phone ?? null,
         email: f.email,
         role: f.role,
+        cluster: f.cluster ?? null,
       },
     });
   }
