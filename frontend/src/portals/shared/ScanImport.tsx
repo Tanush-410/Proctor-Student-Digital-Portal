@@ -253,7 +253,7 @@ export default function ScanImport({ base: _base }: { base: string }) {
               subtitle="PDF (with a real text layer) or an image (JPEG/PNG/WEBP) — images are OCR'd automatically. Nothing here is written to the database yet — you'll review every row first."
             />
             <div className="space-y-4 px-5 py-4">
-              <FileDropzone file={file} onChange={setFile} accept=".pdf,image/jpeg,image/png,image/webp" hint="PDF, JPEG, PNG, or WEBP" />
+              <FileDropzone file={file} onChange={setFile} accept=".pdf,image/jpeg,image/png,image/webp" hint="PDF, JPEG, PNG, or WEBP — up to 100MB" />
               <Button onClick={handleExtract} disabled={!file || extracting} icon={ScanLine}>
                 {extracting ? "Reading..." : `Extract with ${subjects.length} subject${subjects.length === 1 ? "" : "s"}`}
               </Button>

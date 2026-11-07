@@ -21,9 +21,15 @@ const SCAN_EXTENSIONS: Record<string, string> = {
   "image/png": ".png",
   "image/webp": ".webp",
 };
+// A real multi-page result sheet (scanned pages embedded in a PDF) routinely
+// runs 50-100MB — 20MB was rejecting legitimate files. 100MB is generous
+// headroom for that while still bounding worst-case memory use: the whole
+// file is buffered in RAM (memoryStorage) for parsing, on a free-tier
+// container with limited memory, so this isn't raised further without
+// switching to disk-backed storage first.
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 },
+  limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (!ALLOWED_SCAN_TYPES.has(file.mimetype)) {
       return cb(new InvalidFileTypeError("Only PDF, JPEG, PNG, or WEBP files are accepted"));
